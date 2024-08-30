@@ -1,7 +1,7 @@
 NAME		= ircserv
 
 COMPILE		= c++
-CFLAGS		= -Wall -Wextra -Werror -std=c++98 -MMD
+CFLAGS		= -Wall -Wextra -Werror -std=c++98 -pedantic -MMD
 
 SRC_DIR 	= src/
 OBJ_DIR 	= obj/
