@@ -1,10 +1,6 @@
 #include "ft_irc.hpp"
-#define PORT 8080
-// C++ program to show the example of server application in
-// socket programming
 #include <cstring>
 #include <iostream>
-#include <netinet/in.h>
 
 void	printPollfd(struct pollfd fd[], int len)
 {
@@ -51,12 +47,12 @@ int main()
 
 	while (true)
 	{
-		int	events = poll(pfds, fd_count, 20000);
-		if (events == 0)
-		{
-			std::cout << "Poll timed out" << std::endl;
-			break ;
-		}
+		poll(pfds, fd_count, -1);
+		//if (events == 0)
+		//{
+		//	std::cout << "Poll timed out" << std::endl;
+		//	break ;
+		//}
 		for (int i = 0; i < fd_count; i++)
 		{
 			if (pfds[i].revents != POLLIN)
@@ -90,10 +86,13 @@ int main()
 					return 1;
 				}
 				std::cout << "Message from client " << i << " :" << buffer << std::endl;
-				if (!strncmp(buffer, "close", 5))
+				for (int j = 0; j < fd_count; j++)
 				{
-					close(serverSocket);
-					return 0;
+					if (pfds[j].fd != serverSocket && pfds[j].fd != pfds[i].fd)
+					{
+						if (send(pfds[j].fd, buffer, sizeof(buffer), 0 ) == -1)
+							perror("send");
+					}
 				}
 			}
 		}
