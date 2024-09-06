@@ -118,3 +118,8 @@ void	Server::delFromPfds(int index)
 	_pfds[index] = _pfds[_size - 1];
 	_size--;
 }
+
+bool	Server::checkPassword(const std::string &password) const
+{
+	return (password == _password);
+}
