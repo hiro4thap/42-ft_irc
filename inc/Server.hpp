@@ -7,6 +7,7 @@
 # include <cstring>
 # include <iostream>
 # include <vector>
+# include <sstream>
 
 class	Server
 {
@@ -30,24 +31,27 @@ private:
 	void			delFromPfds(int index);
 	bool			checkPassword(const std::string &password) const;
 	// NICK command
-	// void			setNickname(const std::string &nickname, int fd);
+	void			setNickname(const std::string &nickname, int fd);
 	// JOIN command
-	// void			joinChannel(const std::string &channel, int fd, const std::string &password = "");
+	void			joinChannel(const std::string &channel, int fd, const std::string &password = "");
 	// PRIVMSG command
-	// void			sendToChannel(const std::string &channel, const std::string &message ,int fd);
-	// void			sendToUser(const std::string &user, const std::string &message, int fd);
+	void			sendToChannel(const std::string &channel, const std::string &message ,int fd);
+	void			sendToUser(const std::string &user, const std::string &message, int fd);
 	// KICK command
-	// void			kickUser(const std::string &user, int fd, const std::string &comment = "");
+	void			kickUser(const std::string &user, int fd, const std::string &comment = "");
 	// INVITE command
-	// void			inviteUser(const std::string &channel, const std::string &user, int fd);
+	void			inviteUser(const std::string &channel, const std::string &user, int fd);
 	// TOPIC command
-	// void			setTopic(const std::string &channel, int fd, const std::string topic = "");
+	void			setTopic(const std::string &channel, int fd, const std::string topic = "");
 	// MODE command
-	// void			setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
+	void			setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
 	// PART command
-	// void			leaveChannel(const std::string &channel, int fd);
+	void			leaveChannel(const std::string &channel, int fd);
 	// QUIT command
-	// void			quitServer(int fd, const std::string &comment = "");
+	void			quitServer(int fd, const std::string &comment = "");
+
+	void			processCommand(std::string command, int fd);
+	void			sendClient(std::string response, int toFd, int fromFd);
 };
 
 #endif
