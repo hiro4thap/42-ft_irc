@@ -7,6 +7,7 @@
 # include <cstring>
 # include <iostream>
 # include <vector>
+# include <map>
 # include <sstream>
 
 class	Server
@@ -19,13 +20,13 @@ public:
 	void	launch(int serverSocket);
 	
 private:
-	struct pollfd	*_pfds;
-	unsigned int	_port;
-	std::string		_password;
-	unsigned int	_capacity;
-	unsigned int	_size;
-	// vector<Channel>	_channels;
-	// map<int, std::string>	_users;
+	struct pollfd				*_pfds;
+	unsigned int				_port;
+	std::string					_password;
+	unsigned int				_capacity;
+	unsigned int				_size;
+	std::vector<Channel>		_channels;
+	std::map<int, std::string>	_users;
 
 	void			addToPfds(int fd);
 	void			delFromPfds(int index);
@@ -52,6 +53,10 @@ private:
 
 	void			processCommand(std::string command, int fd);
 	void			sendClient(std::string response, int toFd, int fromFd);
+
+	bool			valueExits(const std::string &value);
+	int				findKey(const std::string &value);
+	bool			channelExists(const std::string &channel);
 };
 
 #endif

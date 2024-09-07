@@ -242,3 +242,103 @@ void	Server::processCommand(std::string command, int fromFd)
 	}
 
 }
+
+bool Server::valueExits(const std::string &value)
+{
+	for (std::map<int, std::string>::iterator it = this->_users.begin(); it != this->_users.end(); it++)
+	{
+		if (value == it->second)
+			return true;
+	}
+	return false;
+}
+
+int Server::findKey(const std::string &value)
+{
+	for (std::map<int, std::string>::iterator it = this->_users.begin(); it != this->_users.end(); it++)
+	{
+		if (value == it->second)
+			return it->first;
+	}
+	return -1;
+}
+
+static bool checkValidName(const std::string &nickname)
+{
+	return true;
+}
+
+void	Server::setNickname(const std::string &nickname, int fromFd)
+{
+	// 431 ERR_NONICKNAMEGIVEN
+	if (nickname == "")
+	{
+		sendClient(":No nickname given", fromFd,  _pfds->fd);
+	}
+	// 433 ERR_NICKNAMEINUSE
+	else if (valueExits(nickname))
+	{
+		sendClient(nickname + " :Nickname is already in use", fromFd,  _pfds->fd);
+	}
+	// 432 ERR_ERRONEUSNICKNAME
+	else if (checkValidName(nickname) == false)
+	{
+		sendClient(_users[fromFd] + " :Erroneus nickname", fromFd, _pfds->fd);
+	}
+	// 436 ERR_NICKCOLLISION not implemented
+	// RESPONSE
+	else
+	{
+		sendClient(":" + _users[fromFd] + " NICK " + nickname, fromFd, _pfds->fd);
+	}
+}
+
+void	Server::joinChannel(const std::string &channel, int fd, const std::string &password)
+{
+
+    // 461 ERR_NEEDMOREPARAMS
+	if ()
+	{
+		std::string message = "JOIN :Not enough parameters";
+		sendClient(message, fd, _pfds->fd);
+	}
+    // 403 ERR_NOSUCHCHANNEL
+	else if (channelExists(channel) == false)
+	{
+		std::string message = channel + " :No such channel";
+		sendClient(message, fd, _pfds->fd);
+	}
+    // 405 ERR_TOOMANYCHANNELS not supported
+    // 475 ERR_BADCHANNELKEY
+	else if ()
+	{
+
+	}
+    // 474 ERR_BANNEDFROMCHAN not supported
+    // 471 ERR_CHANNELISFULL not supported
+    // 473 ERR_INVITEONLYCHAN
+	else if ()
+	{
+
+	}
+    // 476 ERR_BADCHANMASK
+	else if ()
+	{
+
+	}
+	else
+	{
+		
+		std::string message = ":" + _users[fd] + " JOIN " + channel;
+		sendClient(message, fd, _pfds->fd);
+
+		// 332 RPL_TOPIC
+		// 333 RPL_TOPICWHOTIME
+		// 353 RPL_NAMREPLY
+		// 366 RPL_ENDOFNAMES
+
+	}
+    
+}
+
+
