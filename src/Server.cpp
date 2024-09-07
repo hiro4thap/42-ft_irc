@@ -82,14 +82,15 @@ void	Server::launch(int serverSocket)
 					return;
 				}
 				std::cout << "Message from client " << i << " :" << buffer << std::endl;
-				for (unsigned int j = 0; j < _size; j++)
-				{
-					if (_pfds[j].fd != serverSocket && _pfds[j].fd != _pfds[i].fd)
-					{
-						if (send(_pfds[j].fd, buffer, sizeof(buffer), 0) == -1)
-							perror("send");
-					}
-				}
+				processCommand(buffer, _pfds[i].fd);
+				// for (unsigned int j = 0; j < _size; j++)
+				// {
+				// 	if (_pfds[j].fd != serverSocket && _pfds[j].fd != _pfds[i].fd)
+				// 	{
+				// 		if (send(_pfds[j].fd, buffer, sizeof(buffer), 0) == -1)
+				// 			perror("send");
+				// 	}
+				// }
 			}
 		}
 	}
@@ -122,4 +123,93 @@ void	Server::delFromPfds(int index)
 bool	Server::checkPassword(const std::string &password) const
 {
 	return (password == _password);
+}
+
+static std::vector<std::string> tokenise(std::string input)
+{
+	std::vector<std::string> tokens;
+
+	std::stringstream ss(input);
+
+	std::string token;
+	while (getline(ss, token, ' '))
+	{
+		if (!token.empty())
+		{
+			tokens.push_back(token);
+		}
+	}
+	return tokens;
+}
+
+void	Server::sendClient(std::string response, int toFd, int fromFd)
+{
+	int serverSocket = _pfds[0].fd;
+	if (toFd != serverSocket && toFd != fromFd)
+	{
+		if (send(toFd, response.c_str(), response.size(), 0) == -1)
+			perror("send");
+	}
+
+}
+
+void	Server::processCommand(std::string command, int fromFd)
+{
+	std::vector<std::string> tokens = tokenise(command);
+	// NICK command
+	// void			setNickname(const std::string &nickname, int fd);
+	if (tokens[0] == "NICK")
+	{
+		setNickname(tokens[1], fromFd);
+	}
+
+	// JOIN command
+	// void			joinChannel(const std::string &channel, int fd, const std::string &password = "");
+	if (tokens[0] == "JOIN")
+	{
+		if (tokens.size() > 2)
+			joinChannel(tokens[1], fromFd, tokens[2]);
+		else
+			joinChannel(tokens[1], fromFd);
+	}
+
+	// PRIVMSG command
+	// void			sendToChannel(const std::string &channel, const std::string &message ,int fd);
+	// void			sendToUser(const std::string &user, const std::string &message, int fd);
+	if (tokens[0] == "PRIVMSG")
+	{
+		if (tokens[1].at(0) == '#' || tokens[1].at(0) == '&')
+		{
+			sendToChannel(tokens[1], command.substr(5 + tokens[1].size() + 1, std::string::npos), fromFd);
+		}
+		else
+		{
+			sendToUser(tokens[1], command.substr(5 + tokens[1].size() + 1, std::string::npos), fromFd);
+		}
+	}
+
+	// KICK command
+	// void			kickUser(const std::string &user, int fd, const std::string &comment = "");&
+	
+
+	// INVITE command
+	// void			inviteUser(const std::string &channel, const std::string &user, int fd);
+
+
+	// TOPIC command
+	// void			setTopic(const std::string &channel, int fd, const std::string topic = "");
+
+
+	// MODE command
+	// void			setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
+	
+	
+	// PART command
+	// void			leaveChannel(const std::string &channel, int fd);
+	
+	
+	// QUIT command
+	// void			quitServer(int fd, const std::string &comment = "");
+
+
 }
