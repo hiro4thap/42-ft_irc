@@ -1,36 +1,41 @@
+#include <string>
 
 void error()
 {
 
 }
 
+/*
+Based on https://datatracker.ietf.org/doc/html/rfc1459
+*/
 
-bool message()
+// <message>  ::= [':' <prefix> <SPACE> ] <command> <params> <crlf>
+bool message(std::string::iterator it)
 {
-	if (':')
+	if (*it == ':')
 	{
-		if (!prefix())
+		if (!prefix(it + 1))
 		{
 			error();
 			return false;
 		}
-		if (!space())
+		if (!space(it + 1))
 		{
 			error();
 			return false;
 		}
 	}
-	if (!command())
+	if (!command(it + 1))
 	{
 		error();
 		return false;
 	}
-	if (!params())
+	if (!params(it + 1))
 	{
 		error();
 		return false;
 	}
-	if (!crlf())
+	if (!crlf(it + 1))
 	{
 		error();
 		return false;
@@ -38,7 +43,8 @@ bool message()
 	return true;
 }
 
-bool prefix()
+// <prefix>   ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]
+bool prefix(std::string::iterator it)
 {
 	if(!servername())
 	{
@@ -67,7 +73,9 @@ bool prefix()
 	return true;
 }
 
-bool command()
+
+// <command>  ::= <letter> { <letter> } | <number> <number> <number>
+bool command(std::string::iterator it)
 {
 	if (!letter())
 	{
@@ -84,35 +92,41 @@ bool command()
 	return true;
 }
 
-bool space()
+// <SPACE>    ::= ' ' { ' ' }
+bool space(std::string::iterator& it)
 {
-	if (!' ')
+	if (*it != ' ')
 		return false;
-	while (' ')
+	it++;
+	while (*it == ' ')
+	{
+		it++;
 		continue;
+	}
 	return true;
 }
 
-
-bool params()
+// <params>   ::= <SPACE> [ ':' <trailing> | <middle> <params> ]
+bool params(std::string::iterator& it)
 {
-	if (!space())
+	if (!space(it))
 	{
 		return false;
 	}
 	while (true)
 	{
-		if (':')
+		if ((*it) == ':')
 		{
-			if (!trailing())
+			it++;
+			if (!trailing(it))
 			{
 				error();
 				return false;
 			}
 		}
-		else if (middle())
+		else if (middle(it))
 		{
-			if (!params())
+			if (!params(it))
 			{
 				error();
 				return false;
@@ -124,34 +138,52 @@ bool params()
 	return true;
 }
 
-bool middle()
+// <middle>   ::= <Any *non-empty* sequence of octets not including SPACE
+//                or NUL or CR or LF, the first of which may not be ':'>
+bool middle(std::string::iterator& it)
 {
-	// <Any *non-empty* sequence of octets not including SPACE or NUL or CR or LF, the first of which may not be ':'>
+	int count = 0;
+	if (*it == ':')
+		return false;
+	while (*it != ' ' && *it != '\0' && *it != '\r' && *it != '\f')
+	{
+		it++;
+		count++;
+	}
+	if (count > 0)
+		return true;
+	return false;
+}
+
+// <trailing> ::= <Any, possibly *empty*, sequence of octets not including NUL or CR or LF>
+bool trailing(std::string::iterator& it)
+{
+	while (*it != '\0' && *it != '\r' && *it != '\f')
+	{
+		it++;
+	}
 	return true;
 }
 
-bool trailing()
+// <crlf>     ::= CR LF
+bool crlf(std::string::iterator& it)
 {
-	// <Any, possibly *empty*, sequence of octets not including NUL or CR or LF>
-	return true;
-}
-
-bool crlf()
-{
-	if (!'\r')
+	if ((*it) != '\r')
 	{
 		return false;
 	}
-	if (!'\f')
+	it++;
+	if ((*it) != '\f')
 	{
 		error();
 		return false;
 	}
+	it++;
 	return true;
 }
 
-
-bool user()
+// <user>       ::= <nonwhite> { <nonwhite> }
+bool user(std::string::iterator it)
 {
 	if (!nonwhite())
 	{
@@ -164,55 +196,78 @@ bool user()
 	return true;
 }
 
-bool letter()
+// <letter>     ::= 'a' ... 'z' | 'A' ... 'Z'
+bool letter(std::string::iterator& it)
 {
-	if (>='a' && <='z' || >='A' && <='Z')
+	if ((*it >= 'a' && *it <='z') || (*it >= 'A' && *it <= 'Z'))
 		return true;
 	return false;
 }
 
-bool number()
+// <number>     ::= '0' ... '9'
+bool number(std::string::iterator& it)
 {
-	if (>='0' && <='9')
+	if (*it >='0' && *it <='9')
 		return true;
 	return false;
 }
 
-bool special()
+bool is_char(std::string::iterator& it, char c)
 {
-	if (in "-[]\`^{}")
+	if (*it == c)
 		return true;
 	return false;
 }
 
-bool letter_digit()
+// <special>    ::= '-' | '[' | ']' | '\' | '`' | '^' | '{' | '}'
+bool is_in(std::string::iterator& it, std::string str)
 {
-	if (letter() || number())
-		return true;
+	for (int i = 0; i < str.size(); i++)
+	{
+		if (is_char(it, str[i]))
+			return true;
+	}
 	return false;
 }
 
-bool letter_digit_dash()
+bool special(std::string::iterator& it)
 {
-	if (letter() || number() || '-')
+	if (is_in("-[]\\`^{}"))
+	{
+		it++;
 		return true;
-	return false;
-}
-
-
-bool nonwhite()
-{
-	if (' ' || '\0' || '\r' || '\f')
-		return false;
+	}
 	return true;
 }
 
-bool servername()
+bool letter_digit(std::string::iterator& it)
+{
+	if (letter(it) || number(it))
+		return true;
+	return false;
+}
+
+bool letter_digit_dash(std::string::iterator& it)
+{
+	if (letter(it) || number(it) || is_char(it,'-'))
+		return true;
+	return false;
+}
+
+// <nonwhite>   ::= <any 8bit code except SPACE (0x20), NUL (0x0), CR (0xd), and LF (0xa)>
+bool nonwhite(std::string::iterator& it)
+{
+	return is_in(it, " \0\r\f")
+}
+
+// <servername> ::= <host>
+bool servername(std::string::iterator it)
 {
 	return host();
 }
 
-bool nick()
+// <nick>       ::= <letter> { <letter> | <number> | <special> }
+bool nick(std::string::iterator it)
 {
 	if (!letter())
 	{
@@ -225,7 +280,10 @@ bool nick()
 	return true;
 }
 
-bool host()
+// <host>       ::= see RFC 952 [DNS:4] for details on allowed hostnames
+// <hname> ::= <name>*["."<name>]
+// <name>  ::= <letter>[*[<let-or-digit-or-hyphen>]<let-or-digit>]
+bool host(std::string::iterator it)
 {
 	if (!letter())
 	{
@@ -250,7 +308,8 @@ bool host()
 
 
 // Target stuff
-bool target()
+// <target>     ::= <to> [ "," <target> ]
+bool target(std::string::iterator it)
 {
 	if (!to())
 	{
@@ -267,8 +326,8 @@ bool target()
 	return true;
 }
 
-
-bool to()
+// <to>         ::= <channel> | <user> '@' <servername> | <nick> | <mask>
+bool to(std::string::iterator it)
 {
 	if (!channel())
 	{
@@ -300,17 +359,18 @@ bool to()
 	return true;
 }
 
-
-bool channel()
+// <channel>    ::= ('#' | '&') <chstring>
+bool channel(std::string::iterator it)
 {
-	if (!'#' && !'&')
+	if ((*it) != '#' && (*it) != '&')
 		return false;
 	if (!chstring())
 		return false;
 	return true;
 }
 
-bool mask()
+// <mask>       ::= ('#' | '$') <chstring>
+bool mask(std::string::iterator it)
 {
 	if (!'#' && !'$')
 		return false;
@@ -319,7 +379,8 @@ bool mask()
 	return true;
 }
 
-bool chstring()
+// <chstring>   ::= <any 8bit code except SPACE, BELL, NUL, CR, LF and comma (',')>
+bool chstring(std::string::iterator it)
 {
 	if (in " \b\0\r\f,")
 		return false;
@@ -336,7 +397,7 @@ bool chstring()
 /* 
 // Based on https://modern.ircdocs.horse/
 
-bool message()
+bool message(std::string::iterator it)
 {
 	if ('@')
 	{
@@ -373,7 +434,7 @@ bool message()
 	return true;
 }
 
-bool space()
+bool space(std::string::iterator it)
 {
 	int count = 0;
 	while (' ')
@@ -386,14 +447,14 @@ bool space()
 	return false;
 }
 
-bool crlf()
+bool crlf(std::string::iterator it)
 {
 	if ("\r\f")
 		return true;
 	return false;
 }
 
-bool tags()
+bool tags(std::string::iterator it)
 {
 	if (!tag())
 		return false;
@@ -408,7 +469,7 @@ bool tags()
 	return true;
 }
 
-bool tag()
+bool tag(std::string::iterator it)
 {
 	if (!key())
 		return false;
@@ -423,7 +484,7 @@ bool tag()
 	return true;
 }
 
-bool key()
+bool key(std::string::iterator it)
 {
 	if (client_prefix())
 	{
@@ -444,14 +505,14 @@ bool key()
 	return true;
 }
 
-bool client_prefix()
+bool client_prefix(std::string::iterator it)
 {
 	if (!'+')
 		return false;
 	return true;
 }
 
-bool escaped_value()
+bool escaped_value(std::string::iterator it)
 {
 	if (!seq_not_null_cr_lf_semi_sp())
 	{
@@ -460,14 +521,14 @@ bool escaped_value()
 	return true;
 }
 
-bool vendor()
+bool vendor(std::string::iterator it)
 {
 	if (!host())
 		return false;
 	return true;
 }
 
-bool source()
+bool source(std::string::iterator it)
 {
 	if (!servername())
 	{
@@ -497,7 +558,7 @@ bool source()
 }
 
 // Needs to be sequence?
-bool seq_not_null_cr_lf_semi_sp()
+bool seq_not_null_cr_lf_semi_sp(std::string::iterator it)
 {
 	if ('\0\r\f; ')
 		return false;
@@ -505,14 +566,14 @@ bool seq_not_null_cr_lf_semi_sp()
 }
 
 // Unclearly defined?
-bool nickname()
+bool nickname(std::string::iterator it)
 {
 	// Chan type?
 	if (!seq_not_null_cr_lf_semi_sp())
 }
 
 
-bool user()
+bool user(std::string::iterator it)
 {
 	if (!seq_not_null_cr_lf_sp())
 	{
@@ -523,12 +584,12 @@ bool user()
 
 // letter* / 3digit
 // Valid command / command code
-bool command()
+bool command(std::string::iterator it)
 {
 	return true;
 }
 
-bool parameters()
+bool parameters(std::string::iterator it)
 {
 	while(space())
 	{
@@ -550,13 +611,13 @@ bool parameters()
 	return true;	
 }
 
-bool nospcrlfcl()
+bool nospcrlfcl(std::string::iterator it)
 {
 	//<sequence of any characters except NUL, CR, LF, colon (`:`) and SPACE>
 	return true;
 }
 
-bool middle()
+bool middle(std::string::iterator it)
 {
 	if (!nospcrlfcl())
 	{
@@ -567,7 +628,7 @@ bool middle()
 	return true;
 }
 
-bool trailing()
+bool trailing(std::string::iterator it)
 {
 	while (':' || ' ' || nospcrlfcl())
 		continue;
