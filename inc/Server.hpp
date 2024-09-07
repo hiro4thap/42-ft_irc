@@ -38,7 +38,7 @@ private:
 	void			sendToChannel(const std::string &channel, const std::string &message ,int fd);
 	void			sendToUser(const std::string &user, const std::string &message, int fd);
 	// KICK command
-	void			kickUser(const std::string &user, int fd, const std::string &comment = "");
+	void			kickUser(const std::string &channel, const std::string &user, int fd, const std::string &comment = "");
 	// INVITE command
 	void			inviteUser(const std::string &channel, const std::string &user, int fd);
 	// TOPIC command
@@ -46,7 +46,7 @@ private:
 	// MODE command
 	void			setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
 	// PART command
-	void			leaveChannel(const std::string &channel, int fd);
+	void			leaveChannel(const std::string &channel, int fd, const std::string &reason = "");
 	// QUIT command
 	void			quitServer(int fd, const std::string &comment = "");
 

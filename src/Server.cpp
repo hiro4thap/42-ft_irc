@@ -1,4 +1,4 @@
-#include "Server.hpp"
+#include "../inc/Server.hpp"
 
 Server::Server()
 {
@@ -150,7 +150,6 @@ void	Server::sendClient(std::string response, int toFd, int fromFd)
 		if (send(toFd, response.c_str(), response.size(), 0) == -1)
 			perror("send");
 	}
-
 }
 
 void	Server::processCommand(std::string command, int fromFd)
@@ -165,7 +164,7 @@ void	Server::processCommand(std::string command, int fromFd)
 
 	// JOIN command
 	// void			joinChannel(const std::string &channel, int fd, const std::string &password = "");
-	if (tokens[0] == "JOIN")
+	else if (tokens[0] == "JOIN")
 	{
 		if (tokens.size() > 2)
 			joinChannel(tokens[1], fromFd, tokens[2]);
@@ -176,7 +175,7 @@ void	Server::processCommand(std::string command, int fromFd)
 	// PRIVMSG command
 	// void			sendToChannel(const std::string &channel, const std::string &message ,int fd);
 	// void			sendToUser(const std::string &user, const std::string &message, int fd);
-	if (tokens[0] == "PRIVMSG")
+	else if (tokens[0] == "PRIVMSG")
 	{
 		if (tokens[1].at(0) == '#' || tokens[1].at(0) == '&')
 		{
@@ -190,26 +189,56 @@ void	Server::processCommand(std::string command, int fromFd)
 
 	// KICK command
 	// void			kickUser(const std::string &user, int fd, const std::string &comment = "");&
-	
+	else if (tokens[0] == "KICK")
+	{
+		if (tokens.size() > 2)
+			kickUser(tokens[1], tokens[2], fromFd, command.substr(5 + tokens[1].size() + tokens[2].size() + 2, std::string::npos));
+		else
+			kickUser(tokens[1], tokens[2], fromFd);
+	}
 
 	// INVITE command
 	// void			inviteUser(const std::string &channel, const std::string &user, int fd);
-
+	else if (tokens[0] == "INVITE")
+	{
+		inviteUser(tokens[1], tokens[2], fromFd);
+	}
 
 	// TOPIC command
 	// void			setTopic(const std::string &channel, int fd, const std::string topic = "");
-
+	else if (tokens[0] == "TOPIC")
+	{
+		if (tokens.size() > 2)
+			setTopic(tokens[1], fromFd, tokens[2]);
+		else
+			setTopic(tokens[1], fromFd);
+	}	
 
 	// MODE command
 	// void			setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
-	
-	
+	// else if (tokens[0] == "MODE")
+	// {
+	// 	setMode(tokens[1],
+	// }
+
 	// PART command
-	// void			leaveChannel(const std::string &channel, int fd);
-	
-	
+	// void			leaveChannel(const std::string &channel, int fd, const std::string &reason);
+	else if (tokens[0] == "PART")
+	{
+		if (tokens.size() > 2)
+			leaveChannel(tokens[1], fromFd, command.substr(tokens[0].size() + tokens[1].size() + 2, std::string::npos));
+		else
+			leaveChannel(tokens[1], fromFd);
+	}
+
 	// QUIT command
 	// void			quitServer(int fd, const std::string &comment = "");
-
+	else if (tokens[0] == "QUIT")
+	{
+		if (tokens.size() > 1)
+			quitServer(fromFd, tokens[1]);
+		else
+			quitServer(fromFd);
+	}
 
 }
