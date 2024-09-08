@@ -9,7 +9,8 @@ OBJ_DIR 	= obj/
 INCS		= -Iinc/
 
 SRC			= main.cpp \
-			  Server.cpp
+			  Server.cpp \
+			  Channel.cpp
 
 OBJ			= $(SRC:.cpp=.o)
 

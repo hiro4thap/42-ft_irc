@@ -2,12 +2,14 @@
 # define CHANNEL_HPP
 
 # include <iostream>
+# include <vector>
 
 class	Channel
 {
 public:
 	Channel(const std::string name);
 	~Channel();
+	const std::string	&getName() const;
 	void				setTopic(const std::string topic);
 	const std::string	&getTopic() const;
 	void				setPassword(const std::string password);
@@ -20,8 +22,12 @@ public:
 	bool				getHasPassword() const;
 	void				setHasLimit(bool value);
 	bool				getHasLimit() const;
-	//void				addUser(const std::string &user);
-	//void				removeUser(const std::string &user);
+	const std::vector<std::string>	&getUsers() const;
+	void				addUser(const std::string &user);
+	void				removeUser(const std::string &user);
+	const std::vector<std::string>	&getOperators() const;
+	void				addOperator(const std::string &user);
+	void				removeOperator(const std::string &user);
 
 private:
 	std::string	_name;
@@ -31,8 +37,8 @@ private:
 	bool		_has_restrict_topic;	//t
 	bool		_has_password;			//k
 	bool		_has_limit;				//l
-	//vector<std::string>	_users;
-	//vector<std::string>	_operators;
+	std::vector<std::string>	_users;
+	std::vector<std::string>	_operators;
 };
 
 #endif
