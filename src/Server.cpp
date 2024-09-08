@@ -123,3 +123,94 @@ bool	Server::checkPassword(const std::string &password) const
 {
 	return (password == _password);
 }
+
+Channel	&Server::getChannelByName(const std::string &name)
+{
+	for (std::size_t i = 0; i < _channels.size(); i++)
+	{
+		if(_channels[i].getName() == name)
+			return _channels[i];
+	}
+	return *(_channels.end());
+}
+
+int	Server::getFdByName(const std::string &name) const
+{
+	for (std::map<int, std::string>::const_iterator it = _users.cbegin(); it != _users.cend(); it++)
+	{
+		if (it->second == name)
+			return it->first;
+	}
+	return -1;
+}
+
+void	Server::setNickname(const std::string &nickname, int fd)
+{
+	//TODO: check if nickname is unique
+	if (_users.find(fd) == _users.end()) // new name
+	{
+		sendClient(":server 001 " + nickname, fd);
+	}
+	else
+	{
+		sendClient(":" + _users[fd] + " NICK " + nickname, fd);
+	}
+	_users[fd] = nickname;
+}
+
+void	Server::joinChannel(const std::string &channel, int fd, const std::string &password)
+{
+	Channel cnl = getChannelByName(channel);
+	if (!password.empty() && cnl.getHasPassword())
+	{
+		if (!cnl.checkPassword(password))
+			return ; // fail to join because of wrong password
+	}
+	if (cnl.getName().empty()) //create new one
+	{
+		Channel new_channel(channel);
+		new_channel.addUser(_users[fd]);
+		new_channel.addOperator(_users[fd]);
+		_channels.push_back(new_channel);
+		sendChannel(":" + _users[fd] + " JOIN " + channel, channel, fd);
+		sendClient(":" + _users[fd] + " JOIN " + channel, fd);
+		sendClient(":server 332 " + _users[fd] + " " + channel + " :" + new_channel.getTopic(), fd);
+		sendClient(":server 353 " + _users[fd] + " = " + channel + " :members", fd); //TODO:get list of members
+		sendClient(":server 366 " + _users[fd] + " " + channel + " :End of NAMES list", fd);
+	}
+	else
+	{
+		cnl.addUser(_users[fd]);
+		sendChannel(":" + _users[fd] + " JOIN " + channel, channel, fd);
+		sendClient(":" + _users[fd] + " JOIN " + channel, fd);
+		sendClient(":server 332 " + _users[fd] + " " + channel + " :" + cnl.getTopic(), fd);
+		sendClient(":server 353 " + _users[fd] + " = " + channel + " :members", fd); //TODO:get list of members
+		sendClient(":server 366 " + _users[fd] + " " + channel + " :End of NAMES list", fd);
+	}
+}
+
+//void	Server::sendToChannel(const std::string &channel, const std::string &message ,int fd);
+//void	Server::sendToUser(const std::string &user, const std::string &message, int fd);
+//void	Server::kickUser(const std::string &user, int fd, const std::string &comment = "");
+//void	Server::inviteUser(const std::string &channel, const std::string &user, int fd);
+//void	Server::setTopic(const std::string &channel, int fd, const std::string topic = "");
+//void	Server::setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
+//void	Server::leaveChannel(const std::string &channel, int fd);
+//void	Server::quitServer(int fd, const std::string &comment = "");
+
+void	Server::sendClient(std::string response, int toFd)
+{
+	int serverSocket = _pfds[0].fd;
+	if (toFd != serverSocket)
+	{
+		if (send(toFd, response.c_str(), response.size(), 0) == -1)
+			perror("send");
+	}
+}
+
+void	Server::sendChannel(std::string response, const std::string &channel, int fromFd)
+{
+	(void)response;
+	(void)fromFd;
+	Channel cnl = getChannelByName(channel);
+}
