@@ -142,19 +142,20 @@ static std::vector<std::string> tokenise(std::string input)
 	return tokens;
 }
 
-void	Server::sendClient(std::string response, int toFd, int fromFd)
+void	Server::sendClient(std::string message, int toFd, int fromFd)
 {
+	std::string response = message + "\r\n";
 	int serverSocket = _pfds[0].fd;
 	if (toFd != serverSocket && toFd != fromFd)
 	{
-		if (send(toFd, response.c_str(), response.size(), 0) == -1)
+		if (send(toFd, response.c_str() , response.size(), 0) == -1)
 			perror("send");
 	}
 }
 
 void	Server::processCommand(std::string command, int fromFd)
 {
-	std::vector<std::string> tokens = tokenise(command);
+	std::vector<std::string> tokens = tokenise(command.substr(0, command.size() - 2));
 	// NICK command
 	// void			setNickname(const std::string &nickname, int fd);
 	if (tokens[0] == "NICK")
@@ -216,10 +217,10 @@ void	Server::processCommand(std::string command, int fromFd)
 
 	// MODE command
 	// void			setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
-	// else if (tokens[0] == "MODE")
-	// {
-	// 	setMode(tokens[1],
-	// }
+	else if (tokens[0] == "MODE")
+	{
+		setMode(tokens[1], tokens[2], fromFd, command.substr(tokens[0].size() + tokens[1].size() + tokens[2].size() + 3, std::string::npos));
+	}
 
 	// PART command
 	// void			leaveChannel(const std::string &channel, int fd, const std::string &reason);
@@ -273,12 +274,12 @@ void	Server::setNickname(const std::string &nickname, int fromFd)
 	// 431 ERR_NONICKNAMEGIVEN
 	if (nickname == "")
 	{
-		sendClient(":No nickname given", fromFd,  _pfds->fd);
+		sendClient(":No nickname given", fromFd, _pfds->fd);
 	}
 	// 433 ERR_NICKNAMEINUSE
 	else if (valueExits(nickname))
 	{
-		sendClient(nickname + " :Nickname is already in use", fromFd,  _pfds->fd);
+		sendClient(nickname + " :Nickname is already in use", fromFd, _pfds->fd);
 	}
 	// 432 ERR_ERRONEUSNICKNAME
 	else if (checkValidName(nickname) == false)
@@ -295,7 +296,7 @@ void	Server::setNickname(const std::string &nickname, int fromFd)
 
 void	Server::joinChannel(const std::string &channel, int fd, const std::string &password)
 {
-
+/* 
     // 461 ERR_NEEDMOREPARAMS
 	if ()
 	{
@@ -337,8 +338,7 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 		// 353 RPL_NAMREPLY
 		// 366 RPL_ENDOFNAMES
 
-	}
-    
+	} */
 }
 
 

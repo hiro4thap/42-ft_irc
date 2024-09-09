@@ -45,7 +45,7 @@ private:
 	// TOPIC command
 	void			setTopic(const std::string &channel, int fd, const std::string topic = "");
 	// MODE command
-	void			setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
+	void			setMode(const std::string &channel, const std::string mode, int fd, const std::string &parameters = "");
 	// PART command
 	void			leaveChannel(const std::string &channel, int fd, const std::string &reason = "");
 	// QUIT command
