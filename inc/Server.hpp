@@ -56,7 +56,7 @@ private:
 
 	bool			valueExits(const std::string &value);
 	int				findKey(const std::string &value);
-	bool			channelExists(const std::string &channel);
+	bool			channelExists(const std::string &channel_str, Channel **channel = 0);
 };
 
 #endif

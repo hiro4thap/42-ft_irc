@@ -83,14 +83,6 @@ void	Server::launch(int serverSocket)
 				}
 				std::cout << "Message from client " << i << " :" << buffer << std::endl;
 				processCommand(buffer, _pfds[i].fd);
-				// for (unsigned int j = 0; j < _size; j++)
-				// {
-				// 	if (_pfds[j].fd != serverSocket && _pfds[j].fd != _pfds[i].fd)
-				// 	{
-				// 		if (send(_pfds[j].fd, buffer, sizeof(buffer), 0) == -1)
-				// 			perror("send");
-				// 	}
-				// }
 			}
 		}
 	}
@@ -296,36 +288,45 @@ void	Server::setNickname(const std::string &nickname, int fromFd)
 
 void	Server::joinChannel(const std::string &channel, int fd, const std::string &password)
 {
-/* 
-    // 461 ERR_NEEDMOREPARAMS
-	if ()
+	Channel *ch;
+	// 461 ERR_NEEDMOREPARAMS
+	if (channel == "")
 	{
 		std::string message = "JOIN :Not enough parameters";
 		sendClient(message, fd, _pfds->fd);
 	}
-    // 403 ERR_NOSUCHCHANNEL
-	else if (channelExists(channel) == false)
+	// 476 ERR_BADCHANMASK
+	else if (Channel::validChannelName(channel) == false)
 	{
+		// std::string message = channel + " :Bad Channel ";
 		std::string message = channel + " :No such channel";
 		sendClient(message, fd, _pfds->fd);
 	}
-    // 405 ERR_TOOMANYCHANNELS not supported
-    // 475 ERR_BADCHANNELKEY
-	else if ()
+	// 403 ERR_NOSUCHCHANNEL
+	// else if (channelExists(channel, &ch) == false)
+	// {
+	// 	std::string message = channel + " :No such channel";
+	// 	sendClient(message, fd, _pfds->fd);
+	// }
+	// 405 ERR_TOOMANYCHANNELS not supported
+	// 475 ERR_BADCHANNELKEY
+	else if (ch->getHasPassword() && ch->checkPassword(password) == false)
 	{
-
+		std::string message = channel + " :Cannot join channel (+k)";
+		sendClient(message, fd, _pfds->fd);
 	}
-    // 474 ERR_BANNEDFROMCHAN not supported
-    // 471 ERR_CHANNELISFULL not supported
-    // 473 ERR_INVITEONLYCHAN
-	else if ()
+	// 474 ERR_BANNEDFROMCHAN not supported
+	// 471 ERR_CHANNELISFULL
+	else if (ch->getHasLimit() && ch->getUsers().size() >= ch->getLimit())
 	{
-
+		std::string message = channel + " :Cannot join channel (+l)";
+		sendClient(message, fd, _pfds->fd);
 	}
-    // 476 ERR_BADCHANMASK
-	else if ()
+	// 473 ERR_INVITEONLYCHAN
+	else if (ch->getIsInviteOnly() && Channel::containsUser(ch->getInvitedUsers(), _users[fd]) == false)
 	{
-
+		std::string message = channel + " :Cannot join channel (+i)";
+		sendClient(message, fd, _pfds->fd);
 	}
 	else
 	{
@@ -338,7 +339,31 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 		// 353 RPL_NAMREPLY
 		// 366 RPL_ENDOFNAMES
 
-	} */
+	}
 }
 
+void	Server::setMode(const std::string &channel, const std::string mode, int fd, const std::string &parameters)
+{
 
+}
+
+bool	Server::channelExists(const std::string &channel_str, Channel **channel)
+{
+	for (std::vector<Channel>::iterator it = this->_channels.begin(); it != this->_channels.end(); it++)
+	{
+		if (it->getName() == channel_str)
+		{
+			if (channel != 0)
+			{
+				*channel = &(*it);
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+const std::vector<std::string>::iterator Server::findIn(std::string str, std::vector<std::string> vec)
+{
+	return (std::find(vec.begin(), vec.end(), str));
+}
