@@ -375,8 +375,10 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 		_channels.push_back(new_channel);
 		sendChannel(":" + _users[fd] + " JOIN " + channel, channel, fd);
 		sendClient(":" + _users[fd] + " JOIN " + channel, fd);
-		if (!new_channel.getTopic().empty())
-			sendClient(":server 332 " + _users[fd] + " " + channel + " :" + new_channel.getTopic(), fd);
+		if (new_channel.getTopic().empty())
+			sendClient(":server 331 " + _users[fd] + " " + channel + " :" + "No topic is set", fd);
+		else
+			sendClient(":server 332 " + _users[fd] + " " + channel + " :" + ch->getTopic(), fd);
 		sendClient(":server 353 " + _users[fd] + " = " + channel + " :@" + _users[fd], fd);
 		sendClient(":server 366 " + _users[fd] + " " + channel + " :End of NAMES list", fd);
 	}
@@ -385,7 +387,9 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 		ch->addUser(_users[fd]);
 		sendChannel(":" + _users[fd] + " JOIN " + channel, channel, fd);
 		sendClient(":" + _users[fd] + " JOIN " + channel, fd);
-		if (!ch->getTopic().empty())
+		if (ch->getTopic().empty())
+			sendClient(":server 331 " + _users[fd] + " " + channel + " :" + "No topic is set", fd);
+		else
 			sendClient(":server 332 " + _users[fd] + " " + channel + " :" + ch->getTopic(), fd);
 		sendClient(":server 353 " + _users[fd] + " = " + channel + " :" + getNameList(ch), fd);
 		sendClient(":server 366 " + _users[fd] + " " + channel + " :End of NAMES list", fd);
@@ -529,20 +533,48 @@ void	Server::inviteUser(const std::string &channel, const std::string &user, int
 // TOPIC command
 void	Server::setTopic(const std::string &channel, int fd, const std::string topic)
 {
-	Channel *cnl = getChannelByName(channel);
-	if (!cnl)
-		return ; // no channel exists
-	if (topic.empty())
+	Channel *ch;
+	// 461 ERR_NEEDMOREPARAMS
+	// if (topic.empty())
+	// {
+	// 	std::string message = "JOIN :Not enough parameters";
+	// 	sendClient(message, fd);
+	// }
+	// 403 ERR_NOSUCHCHANNEL
+	if (channelExists(channel, &ch) == false)
 	{
-		if (!cnl->getTopic().empty())
-			sendClient(":server 332 " + _users[fd] + " " + channel + " :" + cnl->getTopic(), fd);
-		return ;
+		std::string message = channel + " :No such channel";
+		sendClient(message, fd);
 	}
-	if (cnl->getHasRestrictTopic())
-		return ; // strict topic
-	cnl->setTopic(topic.substr(1, topic.size() - 1));
-	sendClient(":" + _users[fd] + " TOPIC " + channel + " " + cnl->getTopic(), fd);
-	sendChannel(":" + _users[fd] + " TOPIC " + channel + " " + topic, channel, fd);
+	// 442 ERR_NOTONCHANNEL
+	else if (ch && Channel::containsUser(ch->getUsers(), _users[fd]) == false)
+	{
+		std::string message = channel + " :You're not on that channel";
+		sendClient(message, fd);
+	}
+
+	// 331 RPL_NOTOPIC
+	// 332 RPL_TOPIC
+	// 333 RPL_TOPICWHOTIME
+	else if (topic.empty())
+	{
+		if (ch->getTopic().empty())
+			sendClient(":server 331 " + _users[fd] + " " + channel + " :" + "No topic is set", fd);
+		else
+			sendClient(":server 332 " + _users[fd] + " " + channel + " :" + ch->getTopic(), fd);
+	}
+	// 482 ERR_CHANOPRIVSNEEDED
+	else if (ch && ch->getHasRestrictTopic() && Channel::containsUser(ch->getOperators(), _users[fd]) == false)
+	{
+		std::string message = channel + " :You're not channel operator";
+		sendClient(message, fd);
+	}
+	else
+	{
+		ch->setTopic(topic.substr(1, topic.size() - 1));
+		sendClient(":" + _users[fd] + " TOPIC " + channel + " " + ch->getTopic(), fd);
+		sendChannel(":" + _users[fd] + " TOPIC " + channel + " " + topic, channel, fd);
+	}
 }
 
 // PART command
