@@ -1,8 +1,21 @@
-#include <string>
+#include "../inc/Parser.hpp"
 
-void error()
+Parser::Parser()
 {
+	_supported_commands.insert("JOIN");
+	_supported_commands.insert("NICK");
+	_supported_commands.insert("PRIVMSG");
+	_supported_commands.insert("KICK");
+	_supported_commands.insert("INVITE");
+	_supported_commands.insert("TOPIC");
+	_supported_commands.insert("MODE");
+	_supported_commands.insert("PART");
+	_supported_commands.insert("QUIT");
+}
 
+void Parser::error(std::string::iterator &it, std::string &func)
+{
+	std::cout << "Error: " + func + "Error encountered at \'" + *it + "\'" << std::endl;
 }
 
 /*
@@ -10,59 +23,88 @@ Based on https://datatracker.ietf.org/doc/html/rfc1459
 */
 
 // <message>  ::= [':' <prefix> <SPACE> ] <command> <params> <crlf>
-bool message(std::string::iterator it)
+bool Parser::message(std::string::iterator it)
 {
-	if (*it == ':')
+	std::string::iterator test;
+	Command cmd;
+	std::string func = "message";
+	if (is_char(it, ':'))
 	{
-		if (!prefix(it + 1))
+		func += "->:";
+		it++;
+		if (!prefix(it))
 		{
-			error();
+			func = func + "->" + "prefix";
+			error(it, func);
 			return false;
 		}
-		if (!space(it + 1))
+		if (!space(it))
 		{
-			error();
+			func = func + "->" + "space";
+			error(it, func);
 			return false;
 		}
 	}
-	if (!command(it + 1))
+	test = it;
+	if (!command(test))
 	{
-		error();
+		func = func + "->" + "command";
+		error(it, func);
 		return false;
 	}
-	if (!params(it + 1))
+	cmd.command = std::string(it, test);
+	if (_supported_commands.find(cmd.command) == _supported_commands.end())
+		return false;
+	it = test;
+	if (!params(it, cmd))
 	{
-		error();
+		func = func + "->" + "params";
+		error(it, func);
 		return false;
 	}
-	if (!crlf(it + 1))
+	if (!crlf(it))
 	{
-		error();
+		func = func + "->" + "crlf";
+		error(it, func);
 		return false;
 	}
+
+	std::cout << "Command: \"" << cmd.command << "\"" << std::endl;
+	std::cout << "Parameter Count: " << cmd.parameters.size() << std::endl;
+	for (std::size_t i = 0; i < cmd.parameters.size(); i++)
+	{
+		std::cout << "[" << i << "]: \"" << cmd.parameters[i] << "\"" << std::endl;
+	}
+
 	return true;
 }
 
 // <prefix>   ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]
-bool prefix(std::string::iterator it)
+bool Parser::prefix(std::string::iterator &it)
 {
-	if(!servername())
+	std::string func = "prefix";
+	if(!servername(it))
 	{
-		if (nick())
+		if (nick(it))
 		{
-			if ('!')
+			func = func + "->" + "nick";
+			if (is_char(it,'!'))
 			{
-				if (!user())
+				if (!user(it))
 				{
-					error();
+					func = func + "->" + "is_char";
+					func = func + "->" + "user";
+					error(it, func);
 					return false;
 				}
 			}
-			if ('@')
+			if (is_char(it,'@'))
 			{
-				if (!host())
+				if (!host(it))
 				{
-					error();
+					func = func + "->" + "is_char";
+					func = func + "->" + "user";
+					error(it, func);
 					return false;
 				}
 			}
@@ -75,25 +117,27 @@ bool prefix(std::string::iterator it)
 
 
 // <command>  ::= <letter> { <letter> } | <number> <number> <number>
-bool command(std::string::iterator it)
+bool Parser::command(std::string::iterator &it)
 {
-	if (!letter())
+	if (!letter(it))
 	{
-		if (number() && number() && number())
+		if (number(it) && number(it) && number(it))
 		{
 			return true;
 		}
 		return false;
 	}
-	while (letter())
+	it++;
+	while (letter(it))
 	{
+		it++;
 		continue ;
 	}
 	return true;
 }
 
 // <SPACE>    ::= ' ' { ' ' }
-bool space(std::string::iterator& it)
+bool Parser::space(std::string::iterator& it)
 {
 	if (*it != ' ')
 		return false;
@@ -107,30 +151,41 @@ bool space(std::string::iterator& it)
 }
 
 // <params>   ::= <SPACE> [ ':' <trailing> | <middle> <params> ]
-bool params(std::string::iterator& it)
+bool Parser::params(std::string::iterator& it, Command &cmd)
 {
+	std::string func = "params";
+	std::string::iterator test;
 	if (!space(it))
 	{
 		return false;
 	}
 	while (true)
 	{
-		if ((*it) == ':')
+		test = it;
+		if (is_char(it,':'))
 		{
 			it++;
 			if (!trailing(it))
 			{
-				error();
+				func = func + "->" + ":";
+				func = func + "->" + "trailing";
+				error(it, func);
 				return false;
 			}
 		}
-		else if (middle(it))
+		else if (middle(test))
 		{
-			if (!params(it))
-			{
-				error();
-				return false;
-			}
+			cmd.parameters.push_back(std::string(it, test));
+			it = test;
+			if (!params(it, cmd))
+				break ;
+			// if (!params(it))
+			// {
+			// 	func = func + "->" + "middle";
+			// 	func = func + "->" + "params";
+			// 	error(it, func);
+			// 	return false;
+			// }
 		}
 		else
 			break;
@@ -140,12 +195,12 @@ bool params(std::string::iterator& it)
 
 // <middle>   ::= <Any *non-empty* sequence of octets not including SPACE
 //                or NUL or CR or LF, the first of which may not be ':'>
-bool middle(std::string::iterator& it)
+bool Parser::middle(std::string::iterator& it)
 {
 	int count = 0;
-	if (*it == ':')
+	if (is_char(it, ':'))
 		return false;
-	while (*it != ' ' && *it != '\0' && *it != '\r' && *it != '\f')
+	while (is_in(it, " \0\r\n") == false)
 	{
 		it++;
 		count++;
@@ -156,7 +211,7 @@ bool middle(std::string::iterator& it)
 }
 
 // <trailing> ::= <Any, possibly *empty*, sequence of octets not including NUL or CR or LF>
-bool trailing(std::string::iterator& it)
+bool Parser::trailing(std::string::iterator& it)
 {
 	while (*it != '\0' && *it != '\r' && *it != '\f')
 	{
@@ -166,16 +221,18 @@ bool trailing(std::string::iterator& it)
 }
 
 // <crlf>     ::= CR LF
-bool crlf(std::string::iterator& it)
+bool Parser::crlf(std::string::iterator& it)
 {
-	if ((*it) != '\r')
+	std::string func = "crlf";
+	if (is_char(it, '\r') == false)
 	{
 		return false;
 	}
 	it++;
-	if ((*it) != '\f')
+	if (is_char(it, '\n') == false)
 	{
-		error();
+		func = func + "->" + "lf";
+		error(it, func);
 		return false;
 	}
 	it++;
@@ -183,13 +240,13 @@ bool crlf(std::string::iterator& it)
 }
 
 // <user>       ::= <nonwhite> { <nonwhite> }
-bool user(std::string::iterator it)
+bool Parser::user(std::string::iterator &it)
 {
-	if (!nonwhite())
+	if (!nonwhite(it))
 	{
 		return false;
 	}
-	while (nonwhite())
+	while (nonwhite(it))
 	{
 		continue;
 	}
@@ -197,7 +254,7 @@ bool user(std::string::iterator it)
 }
 
 // <letter>     ::= 'a' ... 'z' | 'A' ... 'Z'
-bool letter(std::string::iterator& it)
+bool Parser::letter(std::string::iterator& it)
 {
 	if ((*it >= 'a' && *it <='z') || (*it >= 'A' && *it <= 'Z'))
 		return true;
@@ -205,14 +262,14 @@ bool letter(std::string::iterator& it)
 }
 
 // <number>     ::= '0' ... '9'
-bool number(std::string::iterator& it)
+bool Parser::number(std::string::iterator& it)
 {
 	if (*it >='0' && *it <='9')
 		return true;
 	return false;
 }
 
-bool is_char(std::string::iterator& it, char c)
+bool Parser::is_char(std::string::iterator& it, char c)
 {
 	if (*it == c)
 		return true;
@@ -220,9 +277,9 @@ bool is_char(std::string::iterator& it, char c)
 }
 
 // <special>    ::= '-' | '[' | ']' | '\' | '`' | '^' | '{' | '}'
-bool is_in(std::string::iterator& it, std::string str)
+bool Parser::is_in(std::string::iterator& it, std::string str)
 {
-	for (int i = 0; i < str.size(); i++)
+	for (std::size_t i = 0; i < str.size(); i++)
 	{
 		if (is_char(it, str[i]))
 			return true;
@@ -230,9 +287,9 @@ bool is_in(std::string::iterator& it, std::string str)
 	return false;
 }
 
-bool special(std::string::iterator& it)
+bool Parser::special(std::string::iterator& it)
 {
-	if (is_in("-[]\\`^{}"))
+	if (is_in(it, "-[]\\`^{}"))
 	{
 		it++;
 		return true;
@@ -240,14 +297,14 @@ bool special(std::string::iterator& it)
 	return true;
 }
 
-bool letter_digit(std::string::iterator& it)
+bool Parser::letter_digit(std::string::iterator& it)
 {
 	if (letter(it) || number(it))
 		return true;
 	return false;
 }
 
-bool letter_digit_dash(std::string::iterator& it)
+bool Parser::letter_digit_dash(std::string::iterator& it)
 {
 	if (letter(it) || number(it) || is_char(it,'-'))
 		return true;
@@ -255,25 +312,25 @@ bool letter_digit_dash(std::string::iterator& it)
 }
 
 // <nonwhite>   ::= <any 8bit code except SPACE (0x20), NUL (0x0), CR (0xd), and LF (0xa)>
-bool nonwhite(std::string::iterator& it)
+bool Parser::nonwhite(std::string::iterator& it)
 {
-	return is_in(it, " \0\r\f")
+	return is_in(it, " \0\r\f");
 }
 
 // <servername> ::= <host>
-bool servername(std::string::iterator it)
+bool Parser::servername(std::string::iterator &it)
 {
-	return host();
+	return host(it);
 }
 
 // <nick>       ::= <letter> { <letter> | <number> | <special> }
-bool nick(std::string::iterator it)
+bool Parser::nick(std::string::iterator &it)
 {
-	if (!letter())
+	if (!letter(it))
 	{
 		return false;
 	}
-	while (letter() || number() || special())
+	while (letter(it) || number(it) || special(it))
 	{
 		continue;
 	}
@@ -283,21 +340,26 @@ bool nick(std::string::iterator it)
 // <host>       ::= see RFC 952 [DNS:4] for details on allowed hostnames
 // <hname> ::= <name>*["."<name>]
 // <name>  ::= <letter>[*[<let-or-digit-or-hyphen>]<let-or-digit>]
-bool host(std::string::iterator it)
+bool Parser::host(std::string::iterator &it)
 {
-	if (!letter())
+	std::string func = "host";
+	if (!letter(it))
 	{
 		return false;
 	}
-	if (letter_digit_dash() || letter_digit())
+	it++;
+	if (letter_digit_dash(it) || letter_digit(it))
 	{
-		while (letter_digit_dash())
+		it++;
+		while (letter_digit_dash(it))
 		{
+			it++;
 			continue;
 		}
-		if (!letter_digit())
+		if (!letter_digit(it))
 		{
-			error();
+			func = func + "->" + "letter_digit";
+			error(it, func);
 			return false;
 		}
 		return true;
@@ -306,20 +368,23 @@ bool host(std::string::iterator it)
 	
 }
 
-
 // Target stuff
 // <target>     ::= <to> [ "," <target> ]
-bool target(std::string::iterator it)
+bool Parser::target(std::string::iterator &it)
 {
-	if (!to())
+	std::string func = "target";
+	if (!to(it))
 	{
 		return false;
 	}
-	if (',')
+	if (is_char(it,','))
 	{
-		if (!target())
+		it++;
+		if (!target(it))
 		{
-			error();
+			func = func + "->" + "is_char";
+			func = func + "->" + "target";
+			error(it, func);
 			return false;
 		}
 	}
@@ -327,29 +392,33 @@ bool target(std::string::iterator it)
 }
 
 // <to>         ::= <channel> | <user> '@' <servername> | <nick> | <mask>
-bool to(std::string::iterator it)
+bool Parser::to(std::string::iterator &it)
 {
-	if (!channel())
+	std::string func = "to";
+	if (!channel(it))
 	{
-		if (user())
+		if (user(it))
 		{
-			if (!'@')
+			func = func + "->" + "user";
+			if (!is_char(it, '@'))
 			{
-				error();
+				func = func + "->" + "@";
+				error(it, func);
 				return false;
 			}
-			if (!servername())
+			if (!servername(it))
 			{
-				error();
+				func = func + "->" + "servername";
+				error(it, func);
 				return false;
 			}
 			return true;
 		}
-		else if (nick())
+		else if (nick(it))
 		{
 			return true;
 		}
-		else if (mask())
+		else if (mask(it))
 		{
 			return true;
 		}
@@ -360,55 +429,48 @@ bool to(std::string::iterator it)
 }
 
 // <channel>    ::= ('#' | '&') <chstring>
-bool channel(std::string::iterator it)
+bool Parser::channel(std::string::iterator &it)
 {
-	if ((*it) != '#' && (*it) != '&')
+	if (is_char(it,'#') == false && is_char(it, '&') == false)
 		return false;
-	if (!chstring())
+	if (!chstring(it))
 		return false;
 	return true;
 }
 
 // <mask>       ::= ('#' | '$') <chstring>
-bool mask(std::string::iterator it)
+bool Parser::mask(std::string::iterator &it)
 {
-	if (!'#' && !'$')
+	if (is_char(it,'#') == false && is_char(it, '$') == false)
 		return false;
-	if (!chstring())
+	if (!chstring(it))
 		return false;
 	return true;
 }
 
 // <chstring>   ::= <any 8bit code except SPACE, BELL, NUL, CR, LF and comma (',')>
-bool chstring(std::string::iterator it)
+bool Parser::chstring(std::string::iterator &it)
 {
-	if (in " \b\0\r\f,")
+	if (is_in(it, " \b\0\r\f,"))
 		return false;
 	return true;
 }
 
-
-
-
-
-
-
-
 /* 
 // Based on https://modern.ircdocs.horse/
 
-bool message(std::string::iterator it)
+bool Parser::message(std::string::iterator it)
 {
 	if ('@')
 	{
 		if (!tags())
 		{
-			error();
+			error(it, func);
 			return false;
 		}
 		if (!space())
 		{
-			error();
+			error(it, func);
 			return false;
 		}
 	}
@@ -416,12 +478,12 @@ bool message(std::string::iterator it)
 	{
 		if (!source())
 		{
-			error()
+			error(it, func)
 			return false;
 		}
 		if (!space())
 		{
-			error();
+			error(it, func);
 			return false;
 		}
 	}
@@ -434,7 +496,7 @@ bool message(std::string::iterator it)
 	return true;
 }
 
-bool space(std::string::iterator it)
+bool Parser::space(std::string::iterator it)
 {
 	int count = 0;
 	while (' ')
@@ -447,14 +509,14 @@ bool space(std::string::iterator it)
 	return false;
 }
 
-bool crlf(std::string::iterator it)
+bool Parser::crlf(std::string::iterator it)
 {
 	if ("\r\f")
 		return true;
 	return false;
 }
 
-bool tags(std::string::iterator it)
+bool Parser::tags(std::string::iterator it)
 {
 	if (!tag())
 		return false;
@@ -462,14 +524,14 @@ bool tags(std::string::iterator it)
 	{
 		if (!tag())
 		{
-			error();
+			error(it, func);
 			return false;
 		}
 	}
 	return true;
 }
 
-bool tag(std::string::iterator it)
+bool Parser::tag(std::string::iterator it)
 {
 	if (!key())
 		return false;
@@ -477,14 +539,14 @@ bool tag(std::string::iterator it)
 	{
 		if (!escaped_value())
 		{
-			error();
+			error(it, func);
 			return false;
 		}
 	}
 	return true;
 }
 
-bool key(std::string::iterator it)
+bool Parser::key(std::string::iterator it)
 {
 	if (client_prefix())
 	{
@@ -494,7 +556,7 @@ bool key(std::string::iterator it)
 	{
 		if (!'/')
 		{
-			error();
+			error(it, func);
 			return false;
 		}
 	}
@@ -505,14 +567,14 @@ bool key(std::string::iterator it)
 	return true;
 }
 
-bool client_prefix(std::string::iterator it)
+bool Parser::client_prefix(std::string::iterator it)
 {
 	if (!'+')
 		return false;
 	return true;
 }
 
-bool escaped_value(std::string::iterator it)
+bool Parser::escaped_value(std::string::iterator it)
 {
 	if (!seq_not_null_cr_lf_semi_sp())
 	{
@@ -521,14 +583,14 @@ bool escaped_value(std::string::iterator it)
 	return true;
 }
 
-bool vendor(std::string::iterator it)
+bool Parser::vendor(std::string::iterator it)
 {
 	if (!host())
 		return false;
 	return true;
 }
 
-bool source(std::string::iterator it)
+bool Parser::source(std::string::iterator it)
 {
 	if (!servername())
 	{
@@ -538,7 +600,7 @@ bool source(std::string::iterator it)
 			{
 				if (!user())
 				{
-					error();
+					error(it, func);
 					return false;
 				}
 			}
@@ -546,7 +608,7 @@ bool source(std::string::iterator it)
 			{
 				if (!host())
 				{
-					error();
+					error(it, func);
 					return false;
 				}
 			}
@@ -558,7 +620,7 @@ bool source(std::string::iterator it)
 }
 
 // Needs to be sequence?
-bool seq_not_null_cr_lf_semi_sp(std::string::iterator it)
+bool Parser::seq_not_null_cr_lf_semi_sp(std::string::iterator it)
 {
 	if ('\0\r\f; ')
 		return false;
@@ -566,14 +628,14 @@ bool seq_not_null_cr_lf_semi_sp(std::string::iterator it)
 }
 
 // Unclearly defined?
-bool nickname(std::string::iterator it)
+bool Parser::nickname(std::string::iterator it)
 {
 	// Chan type?
 	if (!seq_not_null_cr_lf_semi_sp())
 }
 
 
-bool user(std::string::iterator it)
+bool Parser::user(std::string::iterator it)
 {
 	if (!seq_not_null_cr_lf_sp())
 	{
@@ -584,12 +646,12 @@ bool user(std::string::iterator it)
 
 // letter* / 3digit
 // Valid command / command code
-bool command(std::string::iterator it)
+bool Parser::command(std::string::iterator it)
 {
 	return true;
 }
 
-bool parameters(std::string::iterator it)
+bool Parser::parameters(std::string::iterator it)
 {
 	while(space())
 	{
@@ -597,27 +659,27 @@ bool parameters(std::string::iterator it)
 		{
 			if (!trailing())
 			{
-				error();
+				error(it, func);
 				return false;
 			}
 			return true;
 		}
 		if (!middle())
 		{
-			error();
+			error(it, func);
 			return false;
 		}
 	}
 	return true;	
 }
 
-bool nospcrlfcl(std::string::iterator it)
+bool Parser::nospcrlfcl(std::string::iterator it)
 {
 	//<sequence of any characters except NUL, CR, LF, colon (`:`) and SPACE>
 	return true;
 }
 
-bool middle(std::string::iterator it)
+bool Parser::middle(std::string::iterator it)
 {
 	if (!nospcrlfcl())
 	{
@@ -628,7 +690,7 @@ bool middle(std::string::iterator it)
 	return true;
 }
 
-bool trailing(std::string::iterator it)
+bool Parser::trailing(std::string::iterator it)
 {
 	while (':' || ' ' || nospcrlfcl())
 		continue;

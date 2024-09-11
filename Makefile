@@ -8,7 +8,7 @@ OBJ_DIR 	= obj/
 
 INCS		= -Iinc/
 
-SRC			= main.cpp
+SRC			= main.cpp Parser.cpp
 
 OBJ			= $(SRC:.cpp=.o)
 
