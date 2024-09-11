@@ -1,6 +1,6 @@
 NAME		= ircserv
 
-COMPILE		= c++
+COMPILE		= c++ -g
 CFLAGS		= -Wall -Wextra -Werror -std=c++98 -pedantic -MMD
 
 SRC_DIR 	= src/

@@ -32,7 +32,7 @@ private:
 	void			addToPfds(int fd);
 	void			delFromPfds(int index);
 	bool			checkPassword(const std::string &password) const;
-	Channel			&getChannelByName(const std::string &name);
+	Channel			*getChannelByName(const std::string &name);
 	// NICK command
 	void			setNickname(const std::string &nickname, int fd);
 	// JOIN command
@@ -59,9 +59,9 @@ private:
 	void			sendAllClients(std::string response, int fromFd);
 
 	bool			userExists(const std::string &value);
-	//int				getFdByName(const std::string &name) const;
 	int				getUserFd(const std::string &value);
 	bool			channelExists(const std::string &channel_str, Channel **channel = 0);
+	const std::string	getNameList(const Channel *channel) const;
 };
 
 #endif
