@@ -4,6 +4,8 @@
 # include <iostream>
 # include <vector>
 
+typedef std::vector<std::string>::const_iterator user_it; 
+
 class	Channel
 {
 public:

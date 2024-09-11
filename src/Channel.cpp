@@ -149,13 +149,6 @@ bool	Channel::containsUser(const std::vector<std::string> &user_list, std::strin
 	return false;
 }
 
-static bool chstring(std::string::const_iterator it)
-{
-	if (is_in(it, " \b\0\r\f,"))
-		return false;
-	return true;
-}
-
 static bool is_char(std::string::const_iterator& it, char c)
 {
 	if (*it == c)
@@ -165,12 +158,19 @@ static bool is_char(std::string::const_iterator& it, char c)
 
 static bool is_in(std::string::const_iterator& it, std::string str)
 {
-	for (int i = 0; i < str.size(); i++)
+	for (std::size_t i = 0; i < str.size(); i++)
 	{
 		if (is_char(it, str[i]))
 			return true;
 	}
 	return false;
+}
+
+static bool chstring(std::string::const_iterator it)
+{
+	if (is_in(it, " \b\0\r\f,"))
+		return false;
+	return true;
 }
 
 bool	Channel::validChannelName(const std::string &name)

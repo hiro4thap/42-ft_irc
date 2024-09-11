@@ -53,9 +53,10 @@ private:
 
 	void			processCommand(std::string command, int fd);
 	void			sendClient(std::string response, int toFd, int fromFd);
+	void			sendAllClients(std::string response, int fromFd);
 
-	bool			valueExits(const std::string &value);
-	int				findKey(const std::string &value);
+	bool			userExists(const std::string &value);
+	int				getUserFd(const std::string &value);
 	bool			channelExists(const std::string &channel_str, Channel **channel = 0);
 };
 

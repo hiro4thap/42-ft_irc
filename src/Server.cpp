@@ -236,7 +236,7 @@ void	Server::processCommand(std::string command, int fromFd)
 
 }
 
-bool Server::valueExits(const std::string &value)
+bool Server::userExists(const std::string &value)
 {
 	for (std::map<int, std::string>::iterator it = this->_users.begin(); it != this->_users.end(); it++)
 	{
@@ -246,7 +246,7 @@ bool Server::valueExits(const std::string &value)
 	return false;
 }
 
-int Server::findKey(const std::string &value)
+int Server::getUserFd(const std::string &value)
 {
 	for (std::map<int, std::string>::iterator it = this->_users.begin(); it != this->_users.end(); it++)
 	{
@@ -258,6 +258,7 @@ int Server::findKey(const std::string &value)
 
 static bool checkValidName(const std::string &nickname)
 {
+	(void) nickname;
 	return true;
 }
 
@@ -269,7 +270,7 @@ void	Server::setNickname(const std::string &nickname, int fromFd)
 		sendClient(":No nickname given", fromFd, _pfds->fd);
 	}
 	// 433 ERR_NICKNAMEINUSE
-	else if (valueExits(nickname))
+	else if (userExists(nickname))
 	{
 		sendClient(nickname + " :Nickname is already in use", fromFd, _pfds->fd);
 	}
@@ -310,7 +311,7 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 	// }
 	// 405 ERR_TOOMANYCHANNELS not supported
 	// 475 ERR_BADCHANNELKEY
-	else if (ch->getHasPassword() && ch->checkPassword(password) == false)
+	else if (channelExists(channel, &ch) && ch->getHasPassword() && ch->checkPassword(password) == false)
 	{
 		std::string message = channel + " :Cannot join channel (+k)";
 		sendClient(message, fd, _pfds->fd);
@@ -329,8 +330,7 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 		sendClient(message, fd, _pfds->fd);
 	}
 	else
-	{
-		
+	{	
 		std::string message = ":" + _users[fd] + " JOIN " + channel;
 		sendClient(message, fd, _pfds->fd);
 
@@ -344,7 +344,61 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 
 void	Server::setMode(const std::string &channel, const std::string mode, int fd, const std::string &parameters)
 {
+	(void) channel;
+	(void) mode;
+	(void) fd;
+	(void) parameters;
+	Channel *ch;
 
+	// 403 ERR_NOSUCHCHANNEL
+	if (channelExists(channel, &ch) == false)
+	{
+		std::string message = channel + " :No such channel";
+		sendClient(message, fd, _pfds->fd);
+	}
+
+	// 442 ERR_NOTONCHANNEL
+	else if (Channel::containsUser(ch->getUsers(), _users[_pfds->fd]) == false)
+	{
+		std::string message = channel + " :You're not on that channel";
+		sendClient(message, fd, _pfds->fd);
+	}
+
+	// 482 ERR_CHANOPRIVSNEEDED
+	else if (Channel::containsUser(ch->getOperators(), _users[_pfds->fd]) == false)
+	{
+		std::string message = channel + " :You're not channel operator";
+		sendClient(message, fd, _pfds->fd);
+	}
+
+	// 324 RPL_CHANNELMODEIS
+	else if (mode == "")
+	{
+		std::string message = channel;
+		std::string mode_list = "";
+		if (ch->getIsInviteOnly())
+			mode_list += "i";
+		if (ch->getHasRestrictTopic())
+			mode_list += "t";
+		if (ch->getHasPassword())
+			mode_list += "k";
+		if (ch->getHasLimit())
+			mode_list += "l";
+		if (mode_list.size() > 0)
+			message += " +" + mode_list;
+		sendClient(message, fd, _pfds->fd);
+	}
+
+	// 461 ERR_NEEDMOREPARAMS
+	// 472 ERR_UNKNOWNMODE
+	// 401 ERR_NOSUCHNICK
+	// 467 ERR_KEYSET
+	// 502 ERR_USERSDONTMATCH
+	// 501 ERR_UMODEUNKNOWNFLAG
+	
+	
+	// 367 RPL_BANLIST
+	// 368 RPL_ENDOFBANLIST
 }
 
 bool	Server::channelExists(const std::string &channel_str, Channel **channel)
@@ -363,7 +417,103 @@ bool	Server::channelExists(const std::string &channel_str, Channel **channel)
 	return false;
 }
 
-const std::vector<std::string>::iterator Server::findIn(std::string str, std::vector<std::string> vec)
+void	Server::sendAllClients(std::string response, int fromFd)
 {
-	return (std::find(vec.begin(), vec.end(), str));
+	(void) response;
+	(void) fromFd;
+}
+
+void	Server::sendToChannel(const std::string &channel, const std::string &message, int fd)
+{
+	Channel *ch;
+	if (channelExists(channel, &ch) == false)
+		return ;
+	user_it user = ch->getUsers().begin();
+	user_it end = ch->getUsers().end();
+	for (; user != end; user++)
+	{
+		sendClient(message, getUserFd(*user), fd);
+	}
+}
+
+void	Server::sendToUser(const std::string &user, const std::string &message, int fd)
+{
+	sendClient(message, getUserFd(user), fd);
+}
+
+// KICK command
+void	Server::kickUser(const std::string &channel, const std::string &user, int fd, const std::string &comment)
+{
+	Channel *ch;
+
+	// 476 BADCHANMASK
+	if (Channel::validChannelName(channel) == false)
+	{
+		std::string message = channel + " :Bad Channel ";
+		sendClient(message, fd, _pfds->fd);
+	}
+
+	// 403 ERR_NOSUCHCHANNEL
+	else if (channelExists(channel, &ch) == false)
+	{
+		std::string message = channel + " :No such channel";
+		sendClient(message, fd, _pfds->fd);
+	}
+
+	// 442 ERR_NOTONCHANNEL
+	else if (Channel::containsUser(ch->getUsers(), _users[_pfds->fd]) == false)
+	{
+		std::string message = channel + " :You're not on that channel";
+		sendClient(message, fd, _pfds->fd);
+	}
+
+	// 482 ERR_CHANOPPRIVSNEED
+	else if (Channel::containsUser(ch->getOperators(), _users[_pfds->fd]) == false)
+	{
+		std::string message = channel + " :You're not channel operator";
+		sendClient(message, fd, _pfds->fd);
+	}
+
+	// 462 ERR_NEEDMOREPARAMS
+	
+	// 
+	else
+	{
+		ch->removeUser(user);
+		std::string message = "KICK" + channel + " " + user;
+		if (comment.size() > 0)
+			message += " " + comment;
+		sendAllClients(message, fd);
+	}
+}
+
+// INVITE command
+void	Server::inviteUser(const std::string &channel, const std::string &user, int fd)
+{
+	(void) channel;
+	(void) user;
+	(void) fd;
+}
+
+// TOPIC command
+void	Server::setTopic(const std::string &channel, int fd, const std::string topic)
+{
+	(void) channel;
+	(void) fd;
+	(void) topic;
+}
+
+// PART command
+void	Server::leaveChannel(const std::string &channel, int fd, const std::string &reason)
+{
+	(void) channel;
+	(void) fd;
+	(void) reason;
+}
+
+// QUIT command
+void	Server::quitServer(int fd, const std::string &comment)
+{
+	(void) fd;
+	(void) comment;
 }
