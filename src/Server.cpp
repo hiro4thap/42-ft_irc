@@ -1,4 +1,4 @@
-#include "Server.hpp"
+#include "../inc/Server.hpp"
 
 Server::Server()
 {
@@ -82,14 +82,7 @@ void	Server::launch(int serverSocket)
 					return;
 				}
 				std::cout << "Message from client " << i << " :" << buffer << std::endl;
-				for (unsigned int j = 0; j < _size; j++)
-				{
-					if (_pfds[j].fd != serverSocket && _pfds[j].fd != _pfds[i].fd)
-					{
-						if (send(_pfds[j].fd, buffer, sizeof(buffer), 0) == -1)
-							perror("send");
-					}
-				}
+				processCommand(buffer, _pfds[i].fd);
 			}
 		}
 	}
@@ -134,39 +127,229 @@ Channel	&Server::getChannelByName(const std::string &name)
 	return *(_channels.end());
 }
 
-int	Server::getFdByName(const std::string &name) const
+static std::vector<std::string> tokenise(std::string input)
 {
-	for (std::map<int, std::string>::const_iterator it = _users.cbegin(); it != _users.cend(); it++)
+	std::vector<std::string> tokens;
+
+	std::stringstream ss(input);
+
+	std::string token;
+	while (getline(ss, token, ' '))
 	{
-		if (it->second == name)
+		if (!token.empty())
+		{
+			tokens.push_back(token);
+		}
+	}
+	return tokens;
+}
+
+void	Server::sendClient(std::string message, int toFd)
+{
+	std::string response = message + "\r\n";
+	int serverSocket = _pfds[0].fd;
+	if (toFd != serverSocket)
+	{
+		if (send(toFd, response.c_str() , response.size(), 0) == -1)
+			perror("send");
+	}
+}
+
+void	Server::processCommand(std::string command, int fromFd)
+{
+	std::vector<std::string> tokens = tokenise(command.substr(0, command.size() - 2));
+	// NICK command
+	// void			setNickname(const std::string &nickname, int fd);
+	if (tokens[0] == "NICK")
+	{
+		setNickname(tokens[1], fromFd);
+	}
+
+	// JOIN command
+	// void			joinChannel(const std::string &channel, int fd, const std::string &password = "");
+	else if (tokens[0] == "JOIN")
+	{
+		if (tokens.size() > 2)
+			joinChannel(tokens[1], fromFd, tokens[2]);
+		else
+			joinChannel(tokens[1], fromFd);
+	}
+
+	// PRIVMSG command
+	// void			sendToChannel(const std::string &channel, const std::string &message ,int fd);
+	// void			sendToUser(const std::string &user, const std::string &message, int fd);
+	else if (tokens[0] == "PRIVMSG")
+	{
+		if (tokens[1].at(0) == '#' || tokens[1].at(0) == '&')
+		{
+			sendToChannel(tokens[1], command.substr(5 + tokens[1].size() + 1, std::string::npos), fromFd);
+		}
+		else
+		{
+			sendToUser(tokens[1], command.substr(5 + tokens[1].size() + 1, std::string::npos), fromFd);
+		}
+	}
+
+	// KICK command
+	// void			kickUser(const std::string &user, int fd, const std::string &comment = "");&
+	else if (tokens[0] == "KICK")
+	{
+		if (tokens.size() > 2)
+			kickUser(tokens[1], tokens[2], fromFd, command.substr(5 + tokens[1].size() + tokens[2].size() + 2, std::string::npos));
+		else
+			kickUser(tokens[1], tokens[2], fromFd);
+	}
+
+	// INVITE command
+	// void			inviteUser(const std::string &channel, const std::string &user, int fd);
+	else if (tokens[0] == "INVITE")
+	{
+		inviteUser(tokens[1], tokens[2], fromFd);
+	}
+
+	// TOPIC command
+	// void			setTopic(const std::string &channel, int fd, const std::string topic = "");
+	else if (tokens[0] == "TOPIC")
+	{
+		if (tokens.size() > 2)
+			setTopic(tokens[1], fromFd, tokens[2]);
+		else
+			setTopic(tokens[1], fromFd);
+	}	
+
+	// MODE command
+	// void			setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
+	else if (tokens[0] == "MODE")
+	{
+		setMode(tokens[1], tokens[2], fromFd, command.substr(tokens[0].size() + tokens[1].size() + tokens[2].size() + 3, std::string::npos));
+	}
+
+	// PART command
+	// void			leaveChannel(const std::string &channel, int fd, const std::string &reason);
+	else if (tokens[0] == "PART")
+	{
+		if (tokens.size() > 2)
+			leaveChannel(tokens[1], fromFd, command.substr(tokens[0].size() + tokens[1].size() + 2, std::string::npos));
+		else
+			leaveChannel(tokens[1], fromFd);
+	}
+
+	// QUIT command
+	// void			quitServer(int fd, const std::string &comment = "");
+	else if (tokens[0] == "QUIT")
+	{
+		if (tokens.size() > 1)
+			quitServer(fromFd, tokens[1]);
+		else
+			quitServer(fromFd);
+	}
+
+}
+
+bool Server::userExists(const std::string &value)
+{
+	for (std::map<int, std::string>::iterator it = this->_users.begin(); it != this->_users.end(); it++)
+	{
+		if (value == it->second)
+			return true;
+	}
+	return false;
+}
+
+int Server::getUserFd(const std::string &value)
+{
+	for (std::map<int, std::string>::iterator it = this->_users.begin(); it != this->_users.end(); it++)
+	{
+		if (value == it->second)
 			return it->first;
 	}
 	return -1;
 }
 
-void	Server::setNickname(const std::string &nickname, int fd)
+static bool checkValidName(const std::string &nickname)
 {
-	//TODO: check if nickname is unique
-	if (_users.find(fd) == _users.end()) // new name
+	(void) nickname;
+	return true;
+}
+
+void	Server::setNickname(const std::string &nickname, int fromFd)
+{
+	// 431 ERR_NONICKNAMEGIVEN
+	if (nickname == "")
 	{
-		sendClient(":server 001 " + nickname, fd);
+		sendClient(":No nickname given", fromFd);
+	}
+	// 433 ERR_NICKNAMEINUSE
+	else if (userExists(nickname))
+	{
+		sendClient(nickname + " :Nickname is already in use", fromFd);
+	}
+	// 432 ERR_ERRONEUSNICKNAME
+	else if (checkValidName(nickname) == false)
+	{
+		sendClient(_users[fromFd] + " :Erroneus nickname", fromFd);
+	}
+	// 436 ERR_NICKCOLLISION not implemented
+	// RESPONSE
+	else if (_users.find(fromFd) == _users.end())
+	{
+		sendClient(":server 001 " + nickname, fromFd);
+		_users[fromFd] = nickname;
 	}
 	else
 	{
-		sendClient(":" + _users[fd] + " NICK " + nickname, fd);
+		sendClient(":" + _users[fromFd] + " NICK " + nickname, fromFd);
+		_users[fromFd] = nickname;
 	}
-	_users[fd] = nickname;
 }
 
 void	Server::joinChannel(const std::string &channel, int fd, const std::string &password)
 {
-	Channel cnl = getChannelByName(channel);
-	if (!password.empty() && cnl.getHasPassword())
+	Channel *ch;
+	// 461 ERR_NEEDMOREPARAMS
+	if (channel == "")
 	{
-		if (!cnl.checkPassword(password))
-			return ; // fail to join because of wrong password
+		std::string message = "JOIN :Not enough parameters";
+		sendClient(message, fd);
 	}
-	if (cnl.getName().empty()) //create new one
+	// 476 ERR_BADCHANMASK
+	//else if (Channel::validChannelName(channel) == false)
+	//{
+	//	// std::string message = channel + " :Bad Channel ";
+	//	std::string message = channel + " :No such channel";
+	//	sendClient(message, fd);
+	//}
+	// 403 ERR_NOSUCHCHANNEL
+	// else if (channelExists(channel, &ch) == false)
+	// {
+	// 	std::string message = channel + " :No such channel";
+	// 	sendClient(message, fd);
+	// }
+	// 405 ERR_TOOMANYCHANNELS not supported
+	// 475 ERR_BADCHANNELKEY
+	else if (channelExists(channel, &ch) && ch->getHasPassword() && ch->checkPassword(password) == false)
+	{
+		std::string message = channel + " :Cannot join channel (+k)";
+		sendClient(message, fd);
+	}
+	// 474 ERR_BANNEDFROMCHAN not supported
+	// 471 ERR_CHANNELISFULL
+	else if (ch && ch->getHasLimit() && ch->getUsers().size() >= ch->getLimit())
+	{
+		std::string message = channel + " :Cannot join channel (+l)";
+		sendClient(message, fd);
+	}
+	// 473 ERR_INVITEONLYCHAN
+	else if (ch && ch->getIsInviteOnly() && Channel::containsUser(ch->getInvitedUsers(), _users[fd]) == false)
+	{
+		std::string message = channel + " :Cannot join channel (+i)";
+		sendClient(message, fd);
+	}
+	// 332 RPL_TOPIC
+	// 333 RPL_TOPICWHOTIME
+	// 353 RPL_NAMREPLY
+	// 366 RPL_ENDOFNAMES
+	else if (!ch) //create new one
 	{
 		Channel new_channel(channel);
 		new_channel.addUser(_users[fd]);
@@ -180,10 +363,10 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 	}
 	else
 	{
-		cnl.addUser(_users[fd]);
+		ch->addUser(_users[fd]);
 		sendChannel(":" + _users[fd] + " JOIN " + channel, channel, fd);
 		sendClient(":" + _users[fd] + " JOIN " + channel, fd);
-		sendClient(":server 332 " + _users[fd] + " " + channel + " :" + cnl.getTopic(), fd);
+		sendClient(":server 332 " + _users[fd] + " " + channel + " :" + ch->getTopic(), fd);
 		sendClient(":server 353 " + _users[fd] + " = " + channel + " :members", fd); //TODO:get list of members
 		sendClient(":server 366 " + _users[fd] + " " + channel + " :End of NAMES list", fd);
 	}
@@ -198,19 +381,187 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 //void	Server::leaveChannel(const std::string &channel, int fd);
 //void	Server::quitServer(int fd, const std::string &comment = "");
 
-void	Server::sendClient(std::string response, int toFd)
-{
-	int serverSocket = _pfds[0].fd;
-	if (toFd != serverSocket)
-	{
-		if (send(toFd, response.c_str(), response.size(), 0) == -1)
-			perror("send");
-	}
-}
-
 void	Server::sendChannel(std::string response, const std::string &channel, int fromFd)
 {
 	(void)response;
 	(void)fromFd;
 	Channel cnl = getChannelByName(channel);
+}
+
+void	Server::setMode(const std::string &channel, const std::string mode, int fd, const std::string &parameters)
+{
+	(void) channel;
+	(void) mode;
+	(void) fd;
+	(void) parameters;
+	Channel *ch;
+
+	// 403 ERR_NOSUCHCHANNEL
+	if (channelExists(channel, &ch) == false)
+	{
+		std::string message = channel + " :No such channel";
+		sendClient(message, fd);
+	}
+
+	// 442 ERR_NOTONCHANNEL
+	else if (Channel::containsUser(ch->getUsers(), _users[_pfds->fd]) == false)
+	{
+		std::string message = channel + " :You're not on that channel";
+		sendClient(message, fd);
+	}
+
+	// 482 ERR_CHANOPRIVSNEEDED
+	else if (Channel::containsUser(ch->getOperators(), _users[_pfds->fd]) == false)
+	{
+		std::string message = channel + " :You're not channel operator";
+		sendClient(message, fd);
+	}
+
+	// 324 RPL_CHANNELMODEIS
+	else if (mode == "")
+	{
+		std::string message = channel;
+		std::string mode_list = "";
+		if (ch->getIsInviteOnly())
+			mode_list += "i";
+		if (ch->getHasRestrictTopic())
+			mode_list += "t";
+		if (ch->getHasPassword())
+			mode_list += "k";
+		if (ch->getHasLimit())
+			mode_list += "l";
+		if (mode_list.size() > 0)
+			message += " +" + mode_list;
+		sendClient(message, fd);
+	}
+
+	// 461 ERR_NEEDMOREPARAMS
+	// 472 ERR_UNKNOWNMODE
+	// 401 ERR_NOSUCHNICK
+	// 467 ERR_KEYSET
+	// 502 ERR_USERSDONTMATCH
+	// 501 ERR_UMODEUNKNOWNFLAG
+	
+	
+	// 367 RPL_BANLIST
+	// 368 RPL_ENDOFBANLIST
+}
+
+bool	Server::channelExists(const std::string &channel_str, Channel **channel)
+{
+	for (std::vector<Channel>::iterator it = this->_channels.begin(); it != this->_channels.end(); it++)
+	{
+		if (it->getName() == channel_str)
+		{
+			if (channel != 0)
+			{
+				*channel = &(*it);
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+void	Server::sendAllClients(std::string response, int fromFd)
+{
+	(void) response;
+	(void) fromFd;
+}
+
+void	Server::sendToChannel(const std::string &channel, const std::string &message, int fd)
+{
+	(void)fd;
+	Channel *ch;
+	if (channelExists(channel, &ch) == false)
+		return ;
+	user_it user = ch->getUsers().begin();
+	user_it end = ch->getUsers().end();
+	for (; user != end; user++)
+	{
+		sendClient(message, getUserFd(*user));
+	}
+}
+
+void	Server::sendToUser(const std::string &user, const std::string &message, int fd)
+{
+	(void)fd;
+	sendClient(message, getUserFd(user));
+}
+
+// KICK command
+void	Server::kickUser(const std::string &channel, const std::string &user, int fd, const std::string &comment)
+{
+	Channel *ch;
+
+	// 476 BADCHANMASK
+	if (Channel::validChannelName(channel) == false)
+	{
+		std::string message = channel + " :Bad Channel ";
+		sendClient(message, fd);
+	}
+
+	// 403 ERR_NOSUCHCHANNEL
+	else if (channelExists(channel, &ch) == false)
+	{
+		std::string message = channel + " :No such channel";
+		sendClient(message, fd);
+	}
+
+	// 442 ERR_NOTONCHANNEL
+	else if (Channel::containsUser(ch->getUsers(), _users[_pfds->fd]) == false)
+	{
+		std::string message = channel + " :You're not on that channel";
+		sendClient(message, fd);
+	}
+
+	// 482 ERR_CHANOPPRIVSNEED
+	else if (Channel::containsUser(ch->getOperators(), _users[_pfds->fd]) == false)
+	{
+		std::string message = channel + " :You're not channel operator";
+		sendClient(message, fd);
+	}
+
+	// 462 ERR_NEEDMOREPARAMS
+	
+	// 
+	else
+	{
+		ch->removeUser(user);
+		std::string message = "KICK" + channel + " " + user;
+		if (comment.size() > 0)
+			message += " " + comment;
+		sendAllClients(message, fd);
+	}
+}
+
+// INVITE command
+void	Server::inviteUser(const std::string &channel, const std::string &user, int fd)
+{
+	(void) channel;
+	(void) user;
+	(void) fd;
+}
+
+// TOPIC command
+void	Server::setTopic(const std::string &channel, int fd, const std::string topic)
+{
+	(void) channel;
+	(void) fd;
+	(void) topic;
+}
+
+// PART command
+void	Server::leaveChannel(const std::string &channel, int fd, const std::string &reason)
+{
+	(void) channel;
+	(void) fd;
+	(void) reason;
+}
+
+// QUIT command
+void	Server::quitServer(int fd, const std::string &comment)
+{
+	(void) fd;
+	(void) comment;
 }

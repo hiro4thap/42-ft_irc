@@ -1,5 +1,5 @@
-#include "ft_irc.hpp"
-#include "Server.hpp"
+#include "../inc/ft_irc.hpp"
+#include "../inc/Server.hpp"
 
 int main()
 {
