@@ -36,7 +36,7 @@ public:
 	void				addInvitedUser(const std::string &user);
 	void				removeInvitedUser(const std::string &user);
 
-	static bool			containsUser(const std::vector<std::string> &user_list, std::string &user);
+	static bool			containsUser(const std::vector<std::string> &user_list, const std::string &user);
 	static bool			validChannelName(const std::string &name);
 
 private:

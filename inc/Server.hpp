@@ -62,6 +62,7 @@ private:
 	int				getUserFd(const std::string &value);
 	bool			channelExists(const std::string &channel_str, Channel **channel = 0);
 	const std::string	getNameList(const Channel *channel) const;
+	const std::string	getInvitedChannels(const std::string &user) const;
 };
 
 #endif

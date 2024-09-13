@@ -139,7 +139,7 @@ void	Channel::removeInvitedUser(const std::string &user)
 		_invited_users.erase(it);
 }
 
-bool	Channel::containsUser(const std::vector<std::string> &user_list, std::string &user)
+bool	Channel::containsUser(const std::vector<std::string> &user_list, const std::string &user)
 {
 	for (std::vector<std::string>::const_iterator it = user_list.begin(); it != user_list.end(); it++)
 	{

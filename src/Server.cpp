@@ -221,6 +221,8 @@ void	Server::processCommand(std::string command, int fromFd)
 	// void			inviteUser(const std::string &channel, const std::string &user, int fd);
 	else if (tokens[0] == "INVITE")
 	{
+		if (tokens.size() == 1)
+			inviteUser("", "", fromFd);
 		inviteUser(tokens[1], tokens[2], fromFd);
 	}
 
@@ -238,6 +240,8 @@ void	Server::processCommand(std::string command, int fromFd)
 	// void			setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
 	else if (tokens[0] == "MODE")
 	{
+		if (tokens.size() == 2) //TODO: return modes which are on currently
+			return ;
 		setMode(tokens[1], tokens[2], fromFd, command.substr(tokens[0].size() + tokens[1].size() + tokens[2].size() + 3, std::string::npos));
 	}
 
@@ -364,7 +368,7 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 		sendClient(message, fd);
 	}
 	// 332 RPL_TOPIC
-	// 333 RPL_TOPICWHOTIME
+	// TODO: 333 RPL_TOPICWHOTIME
 	// 353 RPL_NAMREPLY
 	// 366 RPL_ENDOFNAMES
 	else if (!ch) //create new one
@@ -384,6 +388,8 @@ void	Server::joinChannel(const std::string &channel, int fd, const std::string &
 	}
 	else
 	{
+		if (Channel::containsUser(ch->getInvitedUsers(), _users[fd]))
+			ch->removeInvitedUser(_users[fd]);
 		ch->addUser(_users[fd]);
 		sendChannel(":" + _users[fd] + " JOIN " + channel, channel, fd);
 		sendClient(":" + _users[fd] + " JOIN " + channel, fd);
@@ -525,9 +531,55 @@ void	Server::kickUser(const std::string &channel, const std::string &user, int f
 // INVITE command
 void	Server::inviteUser(const std::string &channel, const std::string &user, int fd)
 {
-	(void) channel;
-	(void) user;
-	(void) fd;
+	Channel	*ch;
+	// 336 RPL_INVITELIST
+	// 337 RPL_ENDOFINVITELIST
+	if (channel.empty() && user.empty())
+	{
+		std::string message = ":server 336 " + _users[fd] + getInvitedChannels(_users[fd]);
+		sendClient(message, fd);
+		message = ":server 337 " + _users[fd] + " :End of /INVITE list";
+		sendClient(message, fd);
+	}
+	// 403 ERR_NOSUCHCHANNEL
+	else if (channelExists(channel, &ch) == false)
+	{
+		std::string message = ":server 403 " + channel + " :No such channel";
+		sendClient(message, fd);
+	}
+	// 461 ERR_NEEDMOREPARAMS
+	// 442 ERR_NOTONCHANNEL
+	else if (ch && Channel::containsUser(ch->getUsers(), _users[fd]) == false)
+	{
+		std::string message = ":server 442 " + _users[fd] + " " + channel + " :You're not on that channel";
+		sendClient(message, fd);
+	}
+	// 482 ERR_CHANOPRIVSNEEDED
+	else if (ch && ch->getIsInviteOnly() && Channel::containsUser(ch->getOperators(), _users[fd]) == false)
+	{
+		std::string message = ":server 482 " + channel + " :You're not channel operator";
+		sendClient(message, fd);
+	}
+	// 341 RPL_INVITING
+	else if (ch && Channel::containsUser(ch->getInvitedUsers(), user))
+	{
+		std::string message = ":server 341 " + _users[fd] + " " + user + " " + channel;
+		sendClient(message, fd);
+	}
+	// 443 ERR_USERONCHAN
+	else if (ch && Channel::containsUser(ch->getUsers(), user))
+	{
+		std::string message = ":server 443 " + channel + " :You're not channel operator";
+		sendClient(message, fd);
+	}
+	// RESPONSE
+	else
+	{
+		ch->addInvitedUser(user);
+		std::string message = ":" + _users[fd] + " INVITE " + user + " " + channel;
+		sendClient(message, fd);
+		sendClient(message, getUserFd(user));
+	}
 }
 
 // TOPIC command
@@ -555,7 +607,7 @@ void	Server::setTopic(const std::string &channel, int fd, const std::string topi
 
 	// 331 RPL_NOTOPIC
 	// 332 RPL_TOPIC
-	// 333 RPL_TOPICWHOTIME
+	// TODO: 333 RPL_TOPICWHOTIME
 	else if (topic.empty())
 	{
 		if (ch->getTopic().empty())
@@ -623,4 +675,18 @@ const std::string	Server::getNameList(const Channel *channel) const
 			ss << users[i] << " ";
 	}
 	return ss.str();
+}
+
+const std::string	Server::getInvitedChannels(const std::string &user) const
+{
+	std::string channels = "";
+	for (std::size_t i = 0; i <_channels.size(); i++)
+	{
+		if (Channel::containsUser(_channels[i].getInvitedUsers(), user))
+		{
+			channels += " ";
+			channels += _channels[i].getName();
+		}
+	}
+	return channels;
 }
