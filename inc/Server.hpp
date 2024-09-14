@@ -21,7 +21,7 @@ public:
 	void	launch(int serverSocket);
 	
 private:
-	struct pollfd				*_pfds;
+	struct pollfd				*_pfds; //TODO: type is to be changed as vector<struct pollfd>
 	unsigned int				_port;
 	std::string					_password;
 	unsigned int				_capacity;
@@ -30,7 +30,7 @@ private:
 	std::map<int, std::string>	_users;
 
 	void			addToPfds(int fd);
-	void			delFromPfds(int index);
+	void			delFromPfds(int fromFd);
 	bool			checkPassword(const std::string &password) const;
 	Channel			*getChannelByName(const std::string &name);
 	// NICK command

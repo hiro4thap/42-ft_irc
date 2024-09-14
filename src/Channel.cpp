@@ -176,12 +176,14 @@ static bool chstring(std::string::const_iterator it)
 bool	Channel::validChannelName(const std::string &name)
 {
 	std::string::const_iterator it = name.begin();
-	if ((*it) != '#' && (*it) != '&')
+	if (it == name.end() || ((*it) != '#' && (*it) != '&'))
 		return false;
 	it++;
-	if (!chstring(it))
-		return false;
-	while (chstring(it))
+	while (it != name.end())
+	{
+		if (!chstring(it))
+			return false;
 		it++;
+	}
 	return true;
 }

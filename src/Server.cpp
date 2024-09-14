@@ -106,10 +106,16 @@ void	Server::addToPfds(int fd)
 	_size++;
 }
 
-void	Server::delFromPfds(int index)
+void	Server::delFromPfds(int fromFd)
 {
-	_pfds[index] = _pfds[_size - 1];
-	_size--;
+	for (std::size_t i = 0; i < _size; i++)
+	{
+		if (_pfds[i].fd != fromFd)
+			continue ;
+		close(_pfds[i].fd);
+		_pfds[i] = _pfds[_size - 1];
+		_size--;
+	}	
 }
 
 bool	Server::checkPassword(const std::string &password) const
@@ -263,6 +269,7 @@ void	Server::processCommand(std::string command, int fromFd)
 			quitServer(fromFd, tokens[1]);
 		else
 			quitServer(fromFd);
+		delFromPfds(fromFd);
 	}
 
 }
@@ -563,7 +570,7 @@ void	Server::inviteUser(const std::string &channel, const std::string &user, int
 	// 341 RPL_INVITING
 	else if (ch && Channel::containsUser(ch->getInvitedUsers(), user))
 	{
-		std::string message = ":server 341 " + _users[fd] + " " + user + " " + channel;
+		std::string message = ":server 341 " + _users[fd] + " " + user + " " + channel; //TODO: needs to store who invited a user
 		sendClient(message, fd);
 	}
 	// 443 ERR_USERONCHAN
@@ -632,16 +639,39 @@ void	Server::setTopic(const std::string &channel, int fd, const std::string topi
 // PART command
 void	Server::leaveChannel(const std::string &channel, int fd, const std::string &reason)
 {
-	(void) channel;
-	(void) fd;
-	(void) reason;
+	Channel	*ch;
+	// 461 ERR_NEEDMOREPARAMS
+	// 403 ERR_NOSUCHCHANNEL
+	if (channelExists(channel, &ch) == false)
+	{
+		std::string message = ":server 403 " + channel + " :No such channel";
+		sendClient(message, fd);
+	}
+	// 442 ERR_NOTONCHANNEL
+	else if (ch && Channel::containsUser(ch->getUsers(), _users[fd]) == false)
+	{
+		std::string message = ":server 442 " + channel + " :You're not on that channel";
+		sendClient(message, fd);
+	}
+	// RESPONSE
+	else
+	{
+		ch->removeUser(_users[fd]);
+		std::string message = ":" + _users[fd] + " PART " + channel + " " + reason;
+		sendClient(message, fd);
+		sendChannel(message, channel, fd);
+	}
 }
 
 // QUIT command
 void	Server::quitServer(int fd, const std::string &comment)
 {
-	(void) fd;
-	(void) comment;
+	(void)comment;
+	//std::string	message = "ERROR :closing connection [Quit :test message]";
+	std::string	message = "ERROR :closign connection [Quit " + comment + "]";
+	sendClient(message, fd);
+	message = ":" + _users[fd] + " QUIT :Quit " + comment;
+	sendAllClients(message, fd);
 }
 
 void	Server::sendChannel(std::string response, const std::string &channel, int fromFd)
