@@ -229,7 +229,8 @@ void	Server::processCommand(std::string command, int fromFd)
 	{
 		if (tokens.size() == 1)
 			inviteUser("", "", fromFd);
-		inviteUser(tokens[1], tokens[2], fromFd);
+		else
+			inviteUser(tokens[2], tokens[1], fromFd);
 	}
 
 	// TOPIC command
@@ -543,9 +544,13 @@ void	Server::inviteUser(const std::string &channel, const std::string &user, int
 	// 337 RPL_ENDOFINVITELIST
 	if (channel.empty() && user.empty())
 	{
-		std::string message = ":server 336 " + _users[fd] + getInvitedChannels(_users[fd]);
-		sendClient(message, fd);
-		message = ":server 337 " + _users[fd] + " :End of /INVITE list";
+		std::string channel_list = getInvitedChannels(_users[fd]);
+		if (!channel_list.empty())
+		{
+			std::string	message = ":server 336 " + _users[fd] + " :" + channel_list;
+			sendClient(message, fd);
+		}
+		std::string	message = ":server 337 " + _users[fd] + " :End of /INVITE list";
 		sendClient(message, fd);
 	}
 	// 403 ERR_NOSUCHCHANNEL
@@ -583,8 +588,9 @@ void	Server::inviteUser(const std::string &channel, const std::string &user, int
 	else
 	{
 		ch->addInvitedUser(user);
-		std::string message = ":" + _users[fd] + " INVITE " + user + " " + channel;
-		sendClient(message, fd);
+		//std::string message = ":" + _users[fd] + " INVITE " + user + " " + channel;
+		//sendClient(message, fd);
+		std::string	message = ":" + _users[fd] + " INVITE " + user + " :" + channel;
 		sendClient(message, getUserFd(user));
 	}
 }
@@ -712,11 +718,11 @@ const std::string	Server::getInvitedChannels(const std::string &user) const
 	std::string channels = "";
 	for (std::size_t i = 0; i <_channels.size(); i++)
 	{
-		if (Channel::containsUser(_channels[i].getInvitedUsers(), user))
-		{
+		if (!Channel::containsUser(_channels[i].getInvitedUsers(), user))
+			continue ;
+		if (channels.size() != 0)
 			channels += " ";
-			channels += _channels[i].getName();
-		}
+		channels += _channels[i].getName();
 	}
 	return channels;
 }
