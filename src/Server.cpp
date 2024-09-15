@@ -79,7 +79,7 @@ void	Server::launch(int serverSocket)
 				if (recv(_pfds[i].fd, buffer, sizeof(buffer), 0) == -1)
 				{
 					perror("recv");
-					return;
+					break ;
 				}
 				std::cout << "Message from client " << i << " :" << buffer << std::endl;
 				processCommand(buffer, _pfds[i].fd);
@@ -471,9 +471,9 @@ void	Server::setMode(const std::string &channel, const std::string mode, int fd,
 
 void	Server::sendAllClients(std::string response, int fromFd)
 {
-	for (std::size_t i = 0; i < _users.size(); i++)
+	for (std::size_t i = 0; i < _size; i++)
 	{
-		int fd = getUserFd(_users[i]);
+		int fd = _pfds[i].fd;
 		if (fd == fromFd)
 			continue ;
 		sendClient(response, fd);
@@ -510,14 +510,14 @@ void	Server::kickUser(const std::string &channel, const std::string &user, int f
 	}
 
 	// 442 ERR_NOTONCHANNEL
-	else if (Channel::containsUser(ch->getUsers(), _users[_pfds->fd]) == false)
+	else if (Channel::containsUser(ch->getUsers(), _users[fd]) == false)
 	{
 		std::string message = channel + " :You're not on that channel";
 		sendClient(message, fd);
 	}
 
 	// 482 ERR_CHANOPPRIVSNEED
-	else if (Channel::containsUser(ch->getOperators(), _users[_pfds->fd]) == false)
+	else if (Channel::containsUser(ch->getOperators(), _users[fd]) == false)
 	{
 		std::string message = channel + " :You're not channel operator";
 		sendClient(message, fd);
@@ -528,11 +528,12 @@ void	Server::kickUser(const std::string &channel, const std::string &user, int f
 	// 
 	else
 	{
-		ch->removeUser(user);
-		std::string message = "KICK" + channel + " " + user;
+		std::string message = ":" + _users[fd] + " KICK " + channel + " " + user;
 		if (comment.size() > 0)
 			message += " " + comment;
-		sendAllClients(message, fd);
+		sendClient(message, fd);
+		sendChannel(message, channel, fd);
+		ch->removeUser(user);
 	}
 }
 
@@ -588,8 +589,6 @@ void	Server::inviteUser(const std::string &channel, const std::string &user, int
 	else
 	{
 		ch->addInvitedUser(user);
-		//std::string message = ":" + _users[fd] + " INVITE " + user + " " + channel;
-		//sendClient(message, fd);
 		std::string	message = ":" + _users[fd] + " INVITE " + user + " :" + channel;
 		sendClient(message, getUserFd(user));
 	}
@@ -672,12 +671,12 @@ void	Server::leaveChannel(const std::string &channel, int fd, const std::string 
 // QUIT command
 void	Server::quitServer(int fd, const std::string &comment)
 {
-	(void)comment;
-	//std::string	message = "ERROR :closing connection [Quit :test message]";
-	std::string	message = "ERROR :closign connection [Quit " + comment + "]";
+	std::string	message = "ERROR :closing connection [Quit " + comment + "]";
 	sendClient(message, fd);
 	message = ":" + _users[fd] + " QUIT :Quit " + comment;
 	sendAllClients(message, fd);
+	if (_users.find(fd) != _users.end()) //TODO:remove operators and invited as well
+		_users.erase(fd);
 }
 
 void	Server::sendChannel(std::string response, const std::string &channel, int fromFd)
