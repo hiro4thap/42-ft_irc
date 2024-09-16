@@ -2,20 +2,250 @@
 
 Parser::Parser()
 {
-	_supported_commands.insert("JOIN");
-	_supported_commands.insert("NICK");
-	_supported_commands.insert("PRIVMSG");
-	_supported_commands.insert("KICK");
-	_supported_commands.insert("INVITE");
-	_supported_commands.insert("TOPIC");
-	_supported_commands.insert("MODE");
-	_supported_commands.insert("PART");
-	_supported_commands.insert("QUIT");
+	_supported_commands.insert("JOIN");		// JOIN <channel>{,<channel>} [<key>{,<key>}]
+	_supported_commands.insert("NICK");		// NICK <nickname>
+	_supported_commands.insert("PRIVMSG");	// PRIVMSG <target>{,<target>} <text to be sent>
+	_supported_commands.insert("KICK");		// KICK <channel> <user>{,<user>} [<comment>]
+	_supported_commands.insert("INVITE");	// INVITE <nickname> <channel>
+	_supported_commands.insert("TOPIC");	// TOPIC <channel> [<topic>]
+	_supported_commands.insert("MODE");		// MODE <target> [<modestring> [<mode arguments>...]]
+	_supported_commands.insert("PART");		// PART <channel>{,<channel>} [<reason>]
+	_supported_commands.insert("QUIT");		// QUIT <reason>
 }
 
-void Parser::error(std::string::iterator &it, std::string &func)
+
+
+
+bool Parser::error(std::string::const_iterator &it)
 {
-	std::cout << "Error: " + func + "Error encountered at \'" + *it + "\'" << std::endl;
+	if (_func_stack.size() == 0)
+		return false;
+	std::string location = _func_stack.top();
+	_func_stack.pop();
+	while (this->_func_stack.size() > 0)
+	{
+		location += ("<-" + _func_stack.top());
+		_func_stack.pop();
+	}
+	std::cout << "Error: " + location + ": Error encountered at \'" + *it + "\'" << std::endl;
+	return false;
+}
+
+bool Parser::out(bool value)
+{
+	_func_stack.pop();
+	return value;
+}
+
+bool Parser::validateCommand(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	std::size_t s1 = cmd_in.command.size();
+	std::size_t s2 = cmd_out.command.size();
+	cmd_out.command = cmd_in.command;
+	(void) s1;
+	(void) s2;
+
+	std::map<std::string, bool(*)(ParsedCommand&, Command&)> commands;
+	commands["JOIN"] = &validateJoin;
+	commands["NICK"] = &validateNick;
+	commands["PRIVMSG"] = &validatePrivmsg;
+	commands["KICK"] = &validateKick;
+	commands["INVITE"] = &validateInvite;
+	commands["TOPIC"] = &validateTopic;
+	commands["MODE"] = &validateMode;
+	commands["PART"] = &validatePart;
+	commands["QUIT"] = &validateQuit;
+
+	try
+	{
+		return (commands[cmd_in.command])(cmd_in, cmd_out);
+	}
+	catch (std::exception e)
+	{
+		return false;
+	}
+}
+
+// JOIN <channel>{,<channel>} [<key>{,<key>}]
+bool Parser::validateJoin(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	std::string::const_iterator it, test;
+	if (cmd_in.parameters.size() > 0)
+	{
+		it = cmd_in.parameters[0].begin();
+		test = it;
+		if (!channel(test))
+			return false; // ?
+		cmd_out.channels.push_back(std::string(it, test));
+		it = test;
+		while (is_char(it, ','))
+		{
+			it++;
+			test = it;
+			channel(test);
+			cmd_out.channels.push_back(std::string(it, test));
+		}
+	}
+	if (cmd_in.parameters.size() > 1)
+	{
+		it = cmd_in.parameters[1].begin();
+		test = it;
+		if (!channel(test))
+			return false; // ?
+		cmd_out.channels.push_back(std::string(it, test));
+		it = test;
+		while (is_char(it, ','))
+		{
+			it++;
+			test = it;
+			channel(test);
+			cmd_out.channels.push_back(std::string(it, test));
+		}
+	}
+	return true;
+}
+
+// NICK <nickname>
+bool Parser::validateNick(ParsedCommand &cmd_in, Command &cmd_out)
+{
+
+	if (cmd_in.parameters.size() > 0)
+	{
+		std::string::const_iterator it = cmd_in.parameters[0].begin();
+		if (!nick(it) || *it != '\0')
+			return false;
+		cmd_out.users.push_back(cmd_in.parameters[0]);
+		return true;
+	}
+	return true;
+}
+
+// PRIVMSG <target>{,<target>} <text to be sent>
+bool Parser::validatePrivmsg(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	std::string::const_iterator it, test;
+	if (cmd_in.parameters.size() > 0)
+	{
+		it = cmd_in.parameters[0].begin();
+		test = it;
+		if (!target(test))
+			return false; // ?
+		cmd_out.channels.push_back(std::string(it, test));
+		it = test;
+		while (is_char(it, ','))
+		{
+			it++;
+			test = it;
+			target(test);
+			cmd_out.channels.push_back(std::string(it, test));
+		}
+	}
+	cmd_out.message = cmd_in.trailing;
+	return true;
+}
+
+// KICK <channel> <user>{,<user>} [<comment>]
+bool Parser::validateKick(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	std::string::const_iterator it, test;
+	if (cmd_in.parameters.size() > 0)
+	{
+		it = cmd_in.parameters[1].begin();
+		if (!channel(it) && *it != '\0')
+			return false; // ?
+		cmd_out.channels.push_back(cmd_in.parameters[0]);
+	}
+	if (cmd_in.parameters.size() > 1)
+	{
+		it = cmd_in.parameters[1].begin();
+		test = it;
+		if (!user(test))
+			return false; // ?
+		cmd_out.channels.push_back(std::string(it, test));
+		it = test;
+		while (is_char(it, ','))
+		{
+			it++;
+			test = it;
+			user(test);
+			cmd_out.channels.push_back(std::string(it, test));
+		}
+	}
+	cmd_out.message = cmd_in.trailing;
+	return true;
+}
+
+// INVITE <nickname> <channel>
+bool Parser::validateInvite(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	if (cmd_in.parameters.size() > 0)
+	{
+		std::string::const_iterator it = cmd_in.parameters[0].begin();
+		if (!nick(it) || *it != '\0')
+			return false;
+		cmd_out.users.push_back(cmd_in.parameters[0]);
+	}
+	if (cmd_in.parameters.size() > 1)
+	{
+		std::string::const_iterator it = cmd_in.parameters[1].begin();
+		if (!channel(it) || *it != '\0')
+			return false;
+		cmd_out.channels.push_back(cmd_in.parameters[1]);
+	}
+	return true;
+}
+
+// TOPIC <channel> [<topic>]
+bool Parser::validateTopic(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	if (cmd_in.parameters.size() > 0)
+	{
+		std::string::const_iterator it = cmd_in.parameters[0].begin();
+		if (!channel(it) || *it != '\0')
+			return false;
+		cmd_out.channels.push_back(cmd_in.parameters[0]);
+	}
+	cmd_out.message = cmd_in.trailing;
+	return true;
+}
+
+// MODE <target> [<modestring> [<mode arguments>...]]
+bool Parser::validateMode(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	(void) cmd_in;
+	(void) cmd_out;
+	return true;
+}
+
+// PART <channel>{,<channel>} [<reason>]
+bool Parser::validatePart(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	std::string::const_iterator it, test;
+	if (cmd_in.parameters.size() > 0)
+	{
+		it = cmd_in.parameters[0].begin();
+		test = it;
+		if (!channel(test))
+			return false; // ?
+		cmd_out.channels.push_back(std::string(it, test));
+		it = test;
+		while (is_char(it, ','))
+		{
+			it++;
+			test = it;
+			channel(test);
+			cmd_out.channels.push_back(std::string(it, test));
+		}
+	}
+	cmd_out.message = cmd_in.trailing;
+	return true;
+}
+
+// QUIT <reason>
+bool Parser::validateQuit(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	cmd_out.message = cmd_in.trailing;
+	return true;
 }
 
 /*
@@ -23,101 +253,70 @@ Based on https://datatracker.ietf.org/doc/html/rfc1459
 */
 
 // <message>  ::= [':' <prefix> <SPACE> ] <command> <params> <crlf>
-bool Parser::message(std::string::iterator it)
+bool Parser::message(std::string message, Command &cmd_out)
 {
-	std::string::iterator test;
-	Command cmd;
-	std::string func = "message";
+	_func_stack.push("message");
+	ParsedCommand cmd_in;
+
+	std::string::const_iterator it = message.begin();
+	std::string::const_iterator test = it;
+
+	// Client to not send a source/prefix	
 	if (is_char(it, ':'))
-	{
-		func += "->:";
-		it++;
-		if (!prefix(it))
-		{
-			func = func + "->" + "prefix";
-			error(it, func);
-			return false;
-		}
-		if (!space(it))
-		{
-			func = func + "->" + "space";
-			error(it, func);
-			return false;
-		}
-	}
+		return false;
 	test = it;
 	if (!command(test))
 	{
-		func = func + "->" + "command";
-		error(it, func);
-		return false;
+		return (error(it));
 	}
-	cmd.command = std::string(it, test);
-	if (_supported_commands.find(cmd.command) == _supported_commands.end())
+	cmd_in.command = std::string(it, test);
+	if (_supported_commands.find(cmd_in.command) == _supported_commands.end())
 		return false;
 	it = test;
-	if (!params(it, cmd))
+	if (!params(it, cmd_in))
 	{
-		func = func + "->" + "params";
-		error(it, func);
-		return false;
+		return (error(it));
 	}
 	if (!crlf(it))
 	{
-		func = func + "->" + "crlf";
-		error(it, func);
-		return false;
+		return (error(it));
 	}
-
-	std::cout << "Command: \"" << cmd.command << "\"" << std::endl;
-	std::cout << "Parameter Count: " << cmd.parameters.size() << std::endl;
-	for (std::size_t i = 0; i < cmd.parameters.size(); i++)
-	{
-		std::cout << "[" << i << "]: \"" << cmd.parameters[i] << "\"" << std::endl;
-	}
-
-	return true;
+	bool result = validateCommand(cmd_in, cmd_out);
+	return result;
 }
 
-// <prefix>   ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]
-bool Parser::prefix(std::string::iterator &it)
-{
-	std::string func = "prefix";
-	if(!servername(it))
-	{
-		if (nick(it))
-		{
-			func = func + "->" + "nick";
-			if (is_char(it,'!'))
-			{
-				if (!user(it))
-				{
-					func = func + "->" + "is_char";
-					func = func + "->" + "user";
-					error(it, func);
-					return false;
-				}
-			}
-			if (is_char(it,'@'))
-			{
-				if (!host(it))
-				{
-					func = func + "->" + "is_char";
-					func = func + "->" + "user";
-					error(it, func);
-					return false;
-				}
-			}
-			return true;
-		}
-		return false;
-	}
-	return true;
-}
+// // <prefix>   ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]
+// bool Parser::prefix(std::string::const_iterator &it)
+// {
+// 	_func_stack.push("prefix");
+// 	if(!servername(it))
+// 	{
+// 		if (nick(it))
+// 		{
+// 			if (is_char(it,'!'))
+// 			{
+// 				if (!user(it))
+// 				{
+// 					return error(it);
+// 				}
+// 			}
+// 			if (is_char(it,'@'))
+// 			{
+// 				if (!host(it))
+// 				{
+// 					return error(it);
+// 				}
+// 			}
+// 			return true;
+// 		}
+// 		return false;
+// 	}
+// 	return true;
+// }
 
 
 // <command>  ::= <letter> { <letter> } | <number> <number> <number>
-bool Parser::command(std::string::iterator &it)
+bool Parser::command(std::string::const_iterator &it)
 {
 	if (!letter(it))
 	{
@@ -137,7 +336,7 @@ bool Parser::command(std::string::iterator &it)
 }
 
 // <SPACE>    ::= ' ' { ' ' }
-bool Parser::space(std::string::iterator& it)
+bool Parser::space(std::string::const_iterator& it)
 {
 	if (*it != ' ')
 		return false;
@@ -151,41 +350,31 @@ bool Parser::space(std::string::iterator& it)
 }
 
 // <params>   ::= <SPACE> [ ':' <trailing> | <middle> <params> ]
-bool Parser::params(std::string::iterator& it, Command &cmd)
+bool Parser::params(std::string::const_iterator& it, ParsedCommand &cmd_out)
 {
-	std::string func = "params";
-	std::string::iterator test;
+	_func_stack.push("params");
+	std::string::const_iterator test;
+
 	if (!space(it))
-	{
 		return false;
-	}
 	while (true)
 	{
 		test = it;
-		if (is_char(it,':'))
+		if (is_char(test,':'))
 		{
-			it++;
-			if (!trailing(it))
-			{
-				func = func + "->" + ":";
-				func = func + "->" + "trailing";
-				error(it, func);
-				return false;
-			}
+			test++;
+			if (!trailing(test))
+				return (error(it));
+			cmd_out.trailing = std::string(it, test);
+			it = test;
+			break ;
 		}
 		else if (middle(test))
 		{
-			cmd.parameters.push_back(std::string(it, test));
+			cmd_out.parameters.push_back(std::string(it, test));
 			it = test;
-			if (!params(it, cmd))
+			if (!params(it, cmd_out))
 				break ;
-			// if (!params(it))
-			// {
-			// 	func = func + "->" + "middle";
-			// 	func = func + "->" + "params";
-			// 	error(it, func);
-			// 	return false;
-			// }
 		}
 		else
 			break;
@@ -195,7 +384,7 @@ bool Parser::params(std::string::iterator& it, Command &cmd)
 
 // <middle>   ::= <Any *non-empty* sequence of octets not including SPACE
 //                or NUL or CR or LF, the first of which may not be ':'>
-bool Parser::middle(std::string::iterator& it)
+bool Parser::middle(std::string::const_iterator &it)
 {
 	int count = 0;
 	if (is_char(it, ':'))
@@ -211,9 +400,9 @@ bool Parser::middle(std::string::iterator& it)
 }
 
 // <trailing> ::= <Any, possibly *empty*, sequence of octets not including NUL or CR or LF>
-bool Parser::trailing(std::string::iterator& it)
+bool Parser::trailing(std::string::const_iterator &it)
 {
-	while (*it != '\0' && *it != '\r' && *it != '\f')
+	while (is_in(it, std::string("\0\r\n", 3)))
 	{
 		it++;
 	}
@@ -221,9 +410,9 @@ bool Parser::trailing(std::string::iterator& it)
 }
 
 // <crlf>     ::= CR LF
-bool Parser::crlf(std::string::iterator& it)
+bool Parser::crlf(std::string::const_iterator &it)
 {
-	std::string func = "crlf";
+	_func_stack.push("crlf");
 	if (is_char(it, '\r') == false)
 	{
 		return false;
@@ -231,148 +420,17 @@ bool Parser::crlf(std::string::iterator& it)
 	it++;
 	if (is_char(it, '\n') == false)
 	{
-		func = func + "->" + "lf";
-		error(it, func);
-		return false;
+		return (error(it));
 	}
 	it++;
 	return true;
 }
 
-// <user>       ::= <nonwhite> { <nonwhite> }
-bool Parser::user(std::string::iterator &it)
-{
-	if (!nonwhite(it))
-	{
-		return false;
-	}
-	while (nonwhite(it))
-	{
-		continue;
-	}
-	return true;
-}
-
-// <letter>     ::= 'a' ... 'z' | 'A' ... 'Z'
-bool Parser::letter(std::string::iterator& it)
-{
-	if ((*it >= 'a' && *it <='z') || (*it >= 'A' && *it <= 'Z'))
-		return true;
-	return false;
-}
-
-// <number>     ::= '0' ... '9'
-bool Parser::number(std::string::iterator& it)
-{
-	if (*it >='0' && *it <='9')
-		return true;
-	return false;
-}
-
-bool Parser::is_char(std::string::iterator& it, char c)
-{
-	if (*it == c)
-		return true;
-	return false;
-}
-
-// <special>    ::= '-' | '[' | ']' | '\' | '`' | '^' | '{' | '}'
-bool Parser::is_in(std::string::iterator& it, std::string str)
-{
-	for (std::size_t i = 0; i < str.size(); i++)
-	{
-		if (is_char(it, str[i]))
-			return true;
-	}
-	return false;
-}
-
-bool Parser::special(std::string::iterator& it)
-{
-	if (is_in(it, std::string("-[]\\`^{}", 8)))
-	{
-		it++;
-		return true;
-	}
-	return true;
-}
-
-bool Parser::letter_digit(std::string::iterator& it)
-{
-	if (letter(it) || number(it))
-		return true;
-	return false;
-}
-
-bool Parser::letter_digit_dash(std::string::iterator& it)
-{
-	if (letter(it) || number(it) || is_char(it,'-'))
-		return true;
-	return false;
-}
-
-// <nonwhite>   ::= <any 8bit code except SPACE (0x20), NUL (0x0), CR (0xd), and LF (0xa)>
-bool Parser::nonwhite(std::string::iterator& it)
-{
-	return is_in(it, std::string(" \0\r\n", 4));
-}
-
-// <servername> ::= <host>
-bool Parser::servername(std::string::iterator &it)
-{
-	return host(it);
-}
-
-// <nick>       ::= <letter> { <letter> | <number> | <special> }
-bool Parser::nick(std::string::iterator &it)
-{
-	if (!letter(it))
-	{
-		return false;
-	}
-	while (letter(it) || number(it) || special(it))
-	{
-		continue;
-	}
-	return true;
-}
-
-// <host>       ::= see RFC 952 [DNS:4] for details on allowed hostnames
-// <hname> ::= <name>*["."<name>]
-// <name>  ::= <letter>[*[<let-or-digit-or-hyphen>]<let-or-digit>]
-bool Parser::host(std::string::iterator &it)
-{
-	std::string func = "host";
-	if (!letter(it))
-	{
-		return false;
-	}
-	it++;
-	if (letter_digit_dash(it) || letter_digit(it))
-	{
-		it++;
-		while (letter_digit_dash(it))
-		{
-			it++;
-			continue;
-		}
-		if (!letter_digit(it))
-		{
-			func = func + "->" + "letter_digit";
-			error(it, func);
-			return false;
-		}
-		return true;
-	}
-	return true;
-	
-}
-
-// Target stuff
+// TARGETS
 // <target>     ::= <to> [ "," <target> ]
-bool Parser::target(std::string::iterator &it)
+bool Parser::target(std::string::const_iterator &it)
 {
-	std::string func = "target";
+	// _func_stack.push("target");
 	if (!to(it))
 	{
 		return false;
@@ -382,39 +440,34 @@ bool Parser::target(std::string::iterator &it)
 		it++;
 		if (!target(it))
 		{
-			func = func + "->" + "is_char";
-			func = func + "->" + "target";
-			error(it, func);
 			return false;
+			// return (error(it));
 		}
 	}
 	return true;
 }
 
 // <to>         ::= <channel> | <user> '@' <servername> | <nick> | <mask>
-bool Parser::to(std::string::iterator &it)
+bool Parser::to(std::string::const_iterator &it)
 {
-	std::string func = "to";
+	// _func_stack.push("to");
 	if (!channel(it))
 	{
 		if (user(it))
 		{
-			func = func + "->" + "user";
 			if (!is_char(it, '@'))
 			{
-				func = func + "->" + "@";
-				error(it, func);
 				return false;
+				// return (error(it));
 			}
 			if (!servername(it))
 			{
-				func = func + "->" + "servername";
-				error(it, func);
 				return false;
+				// return (error(it));
 			}
 			return true;
 		}
-		else if (nick(it))
+		else if (nick(it,))
 		{
 			return true;
 		}
@@ -429,17 +482,87 @@ bool Parser::to(std::string::iterator &it)
 }
 
 // <channel>    ::= ('#' | '&') <chstring>
-bool Parser::channel(std::string::iterator &it)
+bool Parser::channel(std::string::const_iterator &it)
 {
 	if (is_char(it,'#') == false && is_char(it, '&') == false)
 		return false;
+	it++;
 	if (!chstring(it))
 		return false;
+		// return error(it);
+	return true;
+}
+
+// <servername> ::= <host>
+bool Parser::servername(std::string::const_iterator &it)
+{
+	return host(it);
+}
+
+// <host>       ::= see RFC 952 [DNS:4] for details on allowed hostnames
+// <hname>      ::= <name>*["."<name>]
+// <name>       ::= <letter>[*[<let-or-digit-or-hyphen>]<let-or-digit>]
+bool Parser::host(std::string::const_iterator &it)
+{
+	// _func_stack.push("host");
+	if (!name(it))
+		return false;
+	std::string::const_iterator test = it;
+	while (is_char(it, '.'))
+	{
+		test++;
+		if (!name(test))
+			return false;
+			// return (error(it));
+	}
+	return true;	
+}
+
+// <name>       ::= <letter> [*[let-or-digit-or-hyphen]<let-or-digit>]
+bool Parser::name(std::string::const_iterator &it)
+{
+	// _func_stack.push("name");
+	if (!letter(it))
+	{
+		return false;
+	}
+	it++;
+	while (letter(it) || number(it) || is_char(it, '-'))
+	{
+		std::string::const_iterator test = it;
+		if (is_char(it, '-'))
+		{
+			test++;
+			// if 'it' is the last character, return error.
+			if (!(letter(test) || number(test) || is_char(test, '-')))
+				return false;
+				// return (error(it));
+		}
+		it++;
+	}
+	return true;
+}
+
+// <nick>       ::= <letter> { <letter> | <number> | <special> }
+bool Parser::nick(std::string::const_iterator &it, std::string::const_iterator &end)
+{
+	if (!letter(it))
+	{
+		return false;
+	}
+	it++;
+	while (letter(it) || number(it) || special(it))
+	{
+		it++;
+		if (it == end)
+			break ;
+		continue;
+	}
 	return true;
 }
 
 // <mask>       ::= ('#' | '$') <chstring>
-bool Parser::mask(std::string::iterator &it)
+bool Parser::mask(std::string::const_iterator &it)
 {
 	if (is_char(it,'#') == false && is_char(it, '$') == false)
 		return false;
@@ -449,252 +572,84 @@ bool Parser::mask(std::string::iterator &it)
 }
 
 // <chstring>   ::= <any 8bit code except SPACE, BELL, NUL, CR, LF and comma (',')>
-bool Parser::chstring(std::string::iterator &it)
+bool Parser::chstring(std::string::const_iterator &it)
 {
-	if (is_in(it, std::string(" \b\0\r\n,", 6)))
+	std::string exclusion_string = std::string(" \b\0\r\n,", 6);
+	if (is_in(it, exclusion_string))
 		return false;
-	return true;
-}
-
-/* 
-// Based on https://modern.ircdocs.horse/
-
-bool Parser::message(std::string::iterator it)
-{
-	if ('@')
+	it++;
+	while (!is_in(it, exclusion_string))
 	{
-		if (!tags())
-		{
-			error(it, func);
-			return false;
-		}
-		if (!space())
-		{
-			error(it, func);
-			return false;
-		}
-	}
-	if (':')
-	{
-		if (!source())
-		{
-			error(it, func)
-			return false;
-		}
-		if (!space())
-		{
-			error(it, func);
-			return false;
-		}
-	}
-	if (!command())
-		return false;
-	if (!parameters())
-		return false;
-	if (!crlf())
-		return false;
-	return true;
-}
-
-bool Parser::space(std::string::iterator it)
-{
-	int count = 0;
-	while (' ')
-	{
-		count ++;
+		it++;
 		continue ;
 	}
-	if (count > 0)
+	return true;
+}
+
+// OTHER
+// <user>       ::= <nonwhite> { <nonwhite> }
+bool Parser::user(std::string::const_iterator &it)
+{
+	if (!nonwhite(it))
+	{
+		return false;
+	}
+	while (nonwhite(it))
+	{
+		continue;
+	}
+	return true;
+}
+
+// <letter>     ::= 'a' ... 'z' | 'A' ... 'Z'
+bool Parser::letter(std::string::const_iterator &it)
+{
+	if ((*it >= 'a' && *it <='z') || (*it >= 'A' && *it <= 'Z'))
 		return true;
 	return false;
 }
 
-bool Parser::crlf(std::string::iterator it)
+// <number>     ::= '0' ... '9'
+bool Parser::number(std::string::const_iterator &it)
 {
-	if ("\r\f")
+	if (*it >='0' && *it <='9')
 		return true;
 	return false;
 }
 
-bool Parser::tags(std::string::iterator it)
+// <special>    ::= '-' | '[' | ']' | '\' | '`' | '^' | '{' | '}'
+bool Parser::special(std::string::const_iterator &it)
 {
-	if (!tag())
-		return false;
-	while (';')
+	if (is_in(it, std::string("-[]\\`^{}", 8)))
 	{
-		if (!tag())
-		{
-			error(it, func);
-			return false;
-		}
+		it++;
+		return true;
 	}
 	return true;
 }
 
-bool Parser::tag(std::string::iterator it)
+// <nonwhite>   ::= <any 8bit code except SPACE (0x20), NUL (0x0), CR (0xd), and LF (0xa)>
+bool Parser::nonwhite(std::string::const_iterator &it)
 {
-	if (!key())
-		return false;
-	if ('=')
-	{
-		if (!escaped_value())
-		{
-			error(it, func);
-			return false;
-		}
-	}
-	return true;
+	return is_in(it, std::string(" \0\r\n", 4));
 }
 
-bool Parser::key(std::string::iterator it)
-{
-	if (client_prefix())
-	{
 
-	}
-	if (vendor())
-	{
-		if (!'/')
-		{
-			error(it, func);
-			return false;
-		}
-	}
-	if (!seq_alpha_num_dash())
-	{
-		return false;
-	}
-	return true;
+// HELPERS
+bool Parser::is_char(std::string::const_iterator &it, char c)
+{
+	if (*it == c)
+		return true;
+	return false;
 }
 
-bool Parser::client_prefix(std::string::iterator it)
-{
-	if (!'+')
-		return false;
-	return true;
-}
 
-bool Parser::escaped_value(std::string::iterator it)
+bool Parser::is_in(std::string::const_iterator &it, std::string str)
 {
-	if (!seq_not_null_cr_lf_semi_sp())
+	for (std::size_t i = 0; i < str.size(); i++)
 	{
-		return false;
-	}
-	return true;
-}
-
-bool Parser::vendor(std::string::iterator it)
-{
-	if (!host())
-		return false;
-	return true;
-}
-
-bool Parser::source(std::string::iterator it)
-{
-	if (!servername())
-	{
-		if (nickname())
-		{
-			if ('!')
-			{
-				if (!user())
-				{
-					error(it, func);
-					return false;
-				}
-			}
-			if ('@')
-			{
-				if (!host())
-				{
-					error(it, func);
-					return false;
-				}
-			}
+		if (is_char(it, str[i]))
 			return true;
-		}
-		else 
-			return false;
 	}
+	return false;
 }
-
-// Needs to be sequence?
-bool Parser::seq_not_null_cr_lf_semi_sp(std::string::iterator it)
-{
-	if ('\0\r\f; ')
-		return false;
-	return true;
-}
-
-// Unclearly defined?
-bool Parser::nickname(std::string::iterator it)
-{
-	// Chan type?
-	if (!seq_not_null_cr_lf_semi_sp())
-}
-
-
-bool Parser::user(std::string::iterator it)
-{
-	if (!seq_not_null_cr_lf_sp())
-	{
-		return false;
-	}
-	return true;
-}
-
-// letter* / 3digit
-// Valid command / command code
-bool Parser::command(std::string::iterator it)
-{
-	return true;
-}
-
-bool Parser::parameters(std::string::iterator it)
-{
-	while(space())
-	{
-		if (':')
-		{
-			if (!trailing())
-			{
-				error(it, func);
-				return false;
-			}
-			return true;
-		}
-		if (!middle())
-		{
-			error(it, func);
-			return false;
-		}
-	}
-	return true;	
-}
-
-bool Parser::nospcrlfcl(std::string::iterator it)
-{
-	//<sequence of any characters except NUL, CR, LF, colon (`:`) and SPACE>
-	return true;
-}
-
-bool Parser::middle(std::string::iterator it)
-{
-	if (!nospcrlfcl())
-	{
-		return false;
-	}
-	while (':' || ' ' || nospcrlfcl())
-		continue;
-	return true;
-}
-
-bool Parser::trailing(std::string::iterator it)
-{
-	while (':' || ' ' || nospcrlfcl())
-		continue;
-	return true;
-} */
-
-

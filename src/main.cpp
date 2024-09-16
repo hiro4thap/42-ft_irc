@@ -59,8 +59,34 @@ void test(std::string message)
 
 	Parser parser;
 	std::cout << "Message is: ";
-	if (parser.message(input.begin()))
+	Command cmd_out;
+	cmd_out.command = "";
+	cmd_out.err_response = 0;
+	cmd_out.threw_error = false;
+	cmd_out.message = "";
+	if (parser.message(input, cmd_out))	
+	{
 		std::cout << "Valid" << std::endl;
+		std::cout << "Command: \"" << cmd_out.command << "\"" << std::endl;
+		std::cout << "Users Count: " << cmd_out.users.size() << std::endl;
+		for (std::size_t i = 0; i < cmd_out.users.size(); i++)
+		{
+			std::cout << "[" << i << "]: \"" << cmd_out.users[i] << "\"" << std::endl;
+		}
+		std::cout << "Channel Count: " << cmd_out.channels.size() << std::endl;
+		for (std::size_t i = 0; i < cmd_out.channels.size(); i++)
+		{
+			std::cout << "[" << i << "]: \"" << cmd_out.channels[i] << "\"" << std::endl;
+		}
+		std::cout << "Key Count: " << cmd_out.keys.size() << std::endl;
+		for (std::size_t i = 0; i < cmd_out.keys.size(); i++)
+		{
+			std::cout << "[" << i << "]: \"" << cmd_out.keys[i] << "\"" << std::endl;
+		}
+		std::cout << "Message: \"" << cmd_out.command << "\"" << std::endl;
+		std::cout << "Threw Error: \"" << ((cmd_out.threw_error) ? "True" : "False") << "\"" << std::endl;
+		std::cout << "Error Code: " << cmd_out.err_response << std::endl;
+	}
 	else
 		std::cout << "Invalid" << std::endl;;
 	std::cout << std::endl;
@@ -73,5 +99,9 @@ int main(void)
 	test("JOIN #Blah");
 	test("KICK #Blah Hal");
 	test("JOIN #foo,#bar fubar,foobar");
+	test("MODE #test");
+	test("MODE #blah +o User");
+	test("PRIVMSG Jeremy,Hiro Hello there!");
+	test("PART #test,#test2 Logging off");
 	return 0;
 }
