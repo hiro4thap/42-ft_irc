@@ -5,28 +5,6 @@
 #include <sstream>
 #include <set>
 
-// static std::vector<std::string> tokenise(std::string input)
-// {
-// 	std::vector<std::string> tokens;
-
-// 	std::stringstream ss(input);
-
-// 	std::string token;
-// 	while (getline(ss, token, ' '))
-// 	{
-// 		if (!token.empty())
-// 		{
-// 			tokens.push_back(token);
-// 		}
-// 	}
-// 	return tokens;
-// }
-
-
-
-
-
-
 enum Replies
 {
 	RPL_NONE = 300,
@@ -73,39 +51,6 @@ enum Replies
 	ERR_USERSDONTMATCH = 502
 };
 
-// std::string send_reply(enum Replies reply, std::vector<std::string> tokens)
-// {
-// 	if (ERR_NONICKNAMEGIVEN)
-// 	{
-// 		return ":No nickname given";
-// 	}
-// 	else if (RPL_TOPIC)
-// 	{
-// 		std::string channel = getChannel()
-// 		return getChannel() + " :" + getTopic()
-// 	}
-// }
-
-// std::vector<std::string> commandNick(std::vector<std::string> tokens)
-// {
-// 	std::vector<std::string> response;
-
-// 	if (tokens.size() == 1)
-// 		response.push_back(send_reply(ERR_NONICKNAMEGIVEN, tokens));
-
-// }
-
-// std::vector<std::string> commandJoin(std::vector<std::string> tokens)
-// {
-// 	std::vector<std::string> response;
-
-// 	response.push_back(send_reply(RPL_TOPIC, tokens));
-// 	response.push_back(send_reply(RPL_NAMERPLY, tokens));
-// 	response.push_back(send_reply(RPL_ENDOFNAMES, tokens));
-
-
-// }
-
 
 void test(std::string message)
 {
@@ -118,34 +63,15 @@ void test(std::string message)
 		std::cout << "Valid" << std::endl;
 	else
 		std::cout << "Invalid" << std::endl;;
+	std::cout << std::endl;
 }
 
 int main(void)
 {
-	// std::set<std::string> commands;
-	// commands.insert("NICK");
-	// commands.insert("JOIN");
-	// commands.insert("PRIVMSG");
-	// commands.insert("KICK");
-	// commands.insert("INVITE");
-	// commands.insert("TOPIC");
-	// commands.insert("MODE");
-
-	std::string input;
-	// getline(std::cin, input);
-
-	// std::vector<std::string> tokens = tokenise(input);
-	// if (commands.find(tokens.at(0)) != commands.end())
-	// {
-	// 	std::cout << tokens.at(0) << std::endl;
-	// }
-
-	// std::cout << input << std::endl;
 	test("NICK Hal");
 	test("MOTD");
-	//test("JOIN #Blah");
-	//test("KICK #Blah Hal");
-	//test("JOIN #foo,#bar fubar,foobar     ; join channel #foo using key \"fubar\".");
-	
+	test("JOIN #Blah");
+	test("KICK #Blah Hal");
+	test("JOIN #foo,#bar fubar,foobar");
 	return 0;
 }

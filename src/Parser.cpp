@@ -200,7 +200,7 @@ bool Parser::middle(std::string::iterator& it)
 	int count = 0;
 	if (is_char(it, ':'))
 		return false;
-	while (is_in(it, " \0\r\n") == false)
+	while (is_in(it, std::string(" \0\r\n", 4)) == false)
 	{
 		it++;
 		count++;
@@ -289,7 +289,7 @@ bool Parser::is_in(std::string::iterator& it, std::string str)
 
 bool Parser::special(std::string::iterator& it)
 {
-	if (is_in(it, "-[]\\`^{}"))
+	if (is_in(it, std::string("-[]\\`^{}", 8)))
 	{
 		it++;
 		return true;
@@ -314,7 +314,7 @@ bool Parser::letter_digit_dash(std::string::iterator& it)
 // <nonwhite>   ::= <any 8bit code except SPACE (0x20), NUL (0x0), CR (0xd), and LF (0xa)>
 bool Parser::nonwhite(std::string::iterator& it)
 {
-	return is_in(it, " \0\r\f");
+	return is_in(it, std::string(" \0\r\n", 4));
 }
 
 // <servername> ::= <host>
@@ -451,7 +451,7 @@ bool Parser::mask(std::string::iterator &it)
 // <chstring>   ::= <any 8bit code except SPACE, BELL, NUL, CR, LF and comma (',')>
 bool Parser::chstring(std::string::iterator &it)
 {
-	if (is_in(it, " \b\0\r\f,"))
+	if (is_in(it, std::string(" \b\0\r\n,", 6)))
 		return false;
 	return true;
 }
