@@ -33,7 +33,9 @@ private:
 	void			delFromPfds(int fromFd);
 	bool			checkPassword(const std::string &password) const;
 	Channel			*getChannelByName(const std::string &name);
-	// NICK command
+
+
+	/* // NICK command
 	void			setNickname(const std::string &nickname, int fd);
 	// JOIN command
 	void			joinChannel(const std::string &channel, int fd, const std::string &password = "");
@@ -51,7 +53,16 @@ private:
 	// PART command
 	void			leaveChannel(const std::string &channel, int fd, const std::string &reason = "");
 	// QUIT command
-	void			quitServer(int fd, const std::string &comment = "");
+	void			quitServer(int fd, const std::string &comment = ""); */
+	void			setNickname(const Command &cmd, int fromFd);
+	void			joinChannel(const Command &cmd, int fromFd);
+	void			sendMessage(const Command &cmd, int fromFd);
+	void			kickUser(const Command &cmd, int fromFd);
+	void			inviteUser(const Command &cmd, int fromFd);
+	void			processTopic(const Command &cmd, int fromFd);
+	void			processMode(const Command &cmd, int fromFd);
+	void			leaveChannel(const Command &cmd, int fromFd);
+	void			quitServer(const Command &cmd, int fromFd);
 
 	void			processCommand(std::string command, int fd);
 	void			sendClient(std::string response, int toFd);
