@@ -9,6 +9,6 @@ int main()
 		return 1;
 	server.launch(fd);
 
-    return 0;
+	return 0;
 }
 
