@@ -250,12 +250,61 @@ bool Parser::validateTopic(ParsedCommand &cmd_in, Command &cmd_out)
 }
 
 // MODE <target> [<modestring> [<mode arguments>...]]
+//    Supported Modes: Channel: itkol
 bool Parser::validateMode(ParsedCommand &cmd_in, Command &cmd_out)
 {
-	(void) cmd_in;
-	(void) cmd_out;
+	std::string str;
+	std::string::const_iterator it, end;
+	if (cmd_in.parameters.size() > 0)
+	{
+		str = cmd_in.parameters[0];
+		it = str.begin();
+		end = str.end();
+		if (!channel(it, end) || *it != '\0')
+			return false;
+		cmd_out.channels.push_back(str);
+	}
+	if (cmd_in.parameters.size() > 1)
+	{
+		cmd_out.threw_error = !modestring(cmd_in.parameters[1], cmd_out);
+	}
+	std::size_t i = 2;
+	while (i < cmd_in.parameters.size())
+	{
+		cmd_out.mode_parameters.push_back(cmd_in.parameters[i]);
+		i++;
+	}
 	return true;
 }
+
+// <modestring>     ::= <+-> <mode> [<modestring>] 
+
+bool Parser::modestring(std::string &modestring, Command &cmd_out)
+{
+	char operation = '+';
+
+	std::string::const_iterator it, end;
+
+	it = modestring.begin();
+	end = modestring.end();
+	while (it != end && is_in(it, "+-lokit"))
+	{
+		if (is_in(it, "+-"))
+			operation = *it;
+		else
+		{
+			std::string mode_op = "";
+			mode_op += operation;
+			mode_op += *it;
+			cmd_out.mode_operations.push_back(mode_op);
+		}
+		it++;
+	}
+	if (it != end)
+		return false;
+	return true;
+}
+
 
 // PART <channel>{,<channel>} [<reason>]
 bool Parser::validatePart(ParsedCommand &cmd_in, Command &cmd_out)

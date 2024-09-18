@@ -84,6 +84,20 @@ void test(std::string message)
 		{
 			std::cout << "    [" << i << "]:            \"" << cmd_out.keys[i] << "\"" << std::endl;
 		}
+		std::cout << "Modes Set:       " << cmd_out.mode_operations.size() << std::endl;
+		for (std::size_t i = 0; i < cmd_out.mode_operations.size(); i++)
+		{
+			std::cout << "    [" << i << "]:            \"" << cmd_out.mode_operations[i] << "\"" << std::endl;
+		}
+		if (cmd_out.mode_operations.size() > 0)
+		{
+			std::cout << "Mode Parameters:       " << cmd_out.mode_parameters.size() << std::endl;
+			for (std::size_t i = 0; i < cmd_out.mode_parameters.size(); i++)
+			{
+				std::cout << "    [" << i << "]:            \"" << cmd_out.mode_parameters[i] << "\"" << std::endl;
+			}
+		}
+
 		std::cout << "Message Set:     " << ((cmd_out.message_set) ? "True" : "False") << std::endl;
 		if (cmd_out.message_set)
 			std::cout << "    Message:    \"" << cmd_out.message << "\"" << std::endl;	
@@ -131,6 +145,15 @@ int main(void)
 	std::cout << "Testing MODE" << std::endl;
 	test("MODE #test");
 	test("MODE #blah +o User");
+	test("MODE #a +ok test pass2");
+	test("MODE #a +ko test pass2");
+	test("MODE #a +o test test2");
+	test("MODE #a +o test +o test2");
+	test("MODE #a +oo test test2");
+	test("MODE #a +o+o test test2");
+	test("MODE #a +o-o test test2");
+	test("MODE #a -o+o test test2");
+	test("MODE #a -k+i-i pass test");
 	std::cout << std::endl;
 
 	std::cout << "Testing PART" << std::endl;

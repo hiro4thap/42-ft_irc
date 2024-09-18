@@ -22,6 +22,9 @@ struct Command
 	std::vector<std::string>	channels;
 	std::vector<std::string>	keys;
 
+	std::vector<std::string>	mode_operations;
+	std::vector<std::string>	mode_parameters;
+
 	bool						message_set;
 	std::string					message;
 
@@ -88,6 +91,8 @@ class Parser
 		static bool mask(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <chstring>   ::= <any 8bit code except SPACE, BELL, NUL, CR, LF and comma (',')>
 		static bool chstring(std::string::const_iterator &it, std::string::const_iterator &end);
+
+		static bool modestring(std::string &modestring, Command &cmd_out);
 
 		// OTHER
 		// <user>       ::= <nonwhite> { <nonwhite> }
