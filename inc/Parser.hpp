@@ -22,6 +22,7 @@ struct Command
 	std::vector<std::string>	channels;
 	std::vector<std::string>	keys;
 
+	bool						message_set;
 	std::string					message;
 
 	bool 						threw_error;
@@ -69,28 +70,28 @@ class Parser
 
 		// TARGETS
 		// <target>     ::= <to> [ "," <target> ]
-		static bool target(std::string::const_iterator &it);
+		static bool target(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <to>         ::= <channel> | <user> '@' <servername> | <nick> | <mask>
-		static bool to(std::string::const_iterator &it);
+		static bool to(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <channel>    ::= ('#' | '&') <chstring>
-		static bool channel(std::string::const_iterator &it);
+		static bool channel(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <servername> ::= <host>
-		static bool servername(std::string::const_iterator &it);
+		static bool servername(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <host>       ::= see RFC 952 [DNS:4] for details on allowed hostnames
 		//				::= <name>*["."<name>]
-		static bool host(std::string::const_iterator &it);
+		static bool host(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <name>       ::= <letter> [*[let-or-digit-or-hyphen]<let-or-digit>]
-		static bool name(std::string::const_iterator &it);
+		static bool name(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <nick>       ::= <letter> { <letter> | <number> | <special> }
 		static bool nick(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <mask>       ::= ('#' | '$') <chstring>
-		static bool mask(std::string::const_iterator &it);
+		static bool mask(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <chstring>   ::= <any 8bit code except SPACE, BELL, NUL, CR, LF and comma (',')>
-		static bool chstring(std::string::const_iterator &it);
+		static bool chstring(std::string::const_iterator &it, std::string::const_iterator &end);
 
 		// OTHER
 		// <user>       ::= <nonwhite> { <nonwhite> }
-		static bool user(std::string::const_iterator &it);
+		static bool user(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <letter>     ::= 'a' ... 'z' | 'A' ... 'Z'
 		static bool letter(std::string::const_iterator& it);
 		// <number>     ::= '0' ... '9'

@@ -69,37 +69,41 @@ bool Parser::validateCommand(ParsedCommand &cmd_in, Command &cmd_out)
 // JOIN <channel>{,<channel>} [<key>{,<key>}]
 bool Parser::validateJoin(ParsedCommand &cmd_in, Command &cmd_out)
 {
-	std::string::const_iterator it, test;
+	std::string str;
+	std::string::const_iterator it, test, end;
 	if (cmd_in.parameters.size() > 0)
 	{
-		it = cmd_in.parameters[0].begin();
-		test = it;
-		if (!channel(test))
-			return false; // ?
-		cmd_out.channels.push_back(std::string(it, test));
-		it = test;
-		while (is_char(it, ','))
+		str = cmd_in.parameters[0];
+		it = str.begin();
+		end = str.end();
+		while (is_char(it, ',') || it == str.begin())
 		{
-			it++;
+			if (is_char(it, ','))
+				it++;
 			test = it;
-			channel(test);
+			if (!channel(test, end))
+				return false; // ?
 			cmd_out.channels.push_back(std::string(it, test));
+			it = test;
 		}
 	}
 	if (cmd_in.parameters.size() > 1)
 	{
-		it = cmd_in.parameters[1].begin();
-		test = it;
-		if (!channel(test))
-			return false; // ?
-		cmd_out.channels.push_back(std::string(it, test));
-		it = test;
-		while (is_char(it, ','))
+		str = cmd_in.parameters[1];
+		it = str.begin();
+		end = str.end();
+		while (is_char(it, ',') || it == str.begin())
 		{
-			it++;
+			if (it != str.begin() || cmd_out.keys.size() > 0)
+				it++;
 			test = it;
-			channel(test);
-			cmd_out.channels.push_back(std::string(it, test));
+			while (nonwhite(test) && !is_char(test, ','))
+				test++;
+			if (it == test)
+				cmd_out.keys.push_back("");
+			else
+				cmd_out.keys.push_back(std::string(it, test));
+			it = test;
 		}
 	}
 	return true;
@@ -112,7 +116,8 @@ bool Parser::validateNick(ParsedCommand &cmd_in, Command &cmd_out)
 	if (cmd_in.parameters.size() > 0)
 	{
 		std::string::const_iterator it = cmd_in.parameters[0].begin();
-		if (!nick(it) || *it != '\0')
+		std::string::const_iterator end = cmd_in.parameters[0].end();
+		if (!nick(it, end) || *it != '\0')
 			return false;
 		cmd_out.users.push_back(cmd_in.parameters[0]);
 		return true;
@@ -123,74 +128,101 @@ bool Parser::validateNick(ParsedCommand &cmd_in, Command &cmd_out)
 // PRIVMSG <target>{,<target>} <text to be sent>
 bool Parser::validatePrivmsg(ParsedCommand &cmd_in, Command &cmd_out)
 {
-	std::string::const_iterator it, test;
+	std::string::const_iterator it, end, test_target, test_channel, test_nick;
 	if (cmd_in.parameters.size() > 0)
 	{
 		it = cmd_in.parameters[0].begin();
-		test = it;
-		if (!target(test))
-			return false; // ?
-		cmd_out.channels.push_back(std::string(it, test));
-		it = test;
-		while (is_char(it, ','))
+		end = cmd_in.parameters[0].end();
+		
+		while (is_char(it, ',') || it == cmd_in.parameters[0].begin())
 		{
-			it++;
-			test = it;
-			target(test);
-			cmd_out.channels.push_back(std::string(it, test));
+			if (is_char(it, ','))
+				it++;
+			test_target = it;
+			if (!target(test_target, end))
+				return false; // ?
+			test_channel = it;
+			test_nick = it;
+			if (channel(test_channel, end))
+			{
+				cmd_out.channels.push_back(std::string(it, test_channel));
+				it = test_channel;
+			}
+			else if (nick(test_nick, end))
+			{
+				cmd_out.users.push_back(std::string(it, test_nick));
+				it = test_nick;
+			}
 		}
 	}
-	cmd_out.message = cmd_in.trailing;
+	if (cmd_in.trailing.size() > 0)
+	{
+		cmd_out.message_set = true;
+		cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
+	}
 	return true;
 }
 
 // KICK <channel> <user>{,<user>} [<comment>]
 bool Parser::validateKick(ParsedCommand &cmd_in, Command &cmd_out)
 {
-	std::string::const_iterator it, test;
+	std::string str;
+	std::string::const_iterator it, test, end;
 	if (cmd_in.parameters.size() > 0)
 	{
-		it = cmd_in.parameters[1].begin();
-		if (!channel(it) && *it != '\0')
+		str = cmd_in.parameters[0];
+		it = str.begin();
+		end = str.end();
+		if (!channel(it, end) && *it != '\0')
 			return false; // ?
 		cmd_out.channels.push_back(cmd_in.parameters[0]);
 	}
 	if (cmd_in.parameters.size() > 1)
 	{
-		it = cmd_in.parameters[1].begin();
-		test = it;
-		if (!user(test))
-			return false; // ?
-		cmd_out.channels.push_back(std::string(it, test));
-		it = test;
-		while (is_char(it, ','))
+		str = cmd_in.parameters[1];
+		it = str.begin();
+		end = str.end();
+		while (is_char(it, ',') || it == str.begin())
 		{
-			it++;
+			if (it != str.begin())
+				it++;
 			test = it;
-			user(test);
-			cmd_out.channels.push_back(std::string(it, test));
+			if (!user(test, end))
+				return false; // ?
+			cmd_out.users.push_back(std::string(it, test));
+			it = test;
 		}
 	}
-	cmd_out.message = cmd_in.trailing;
+	if (cmd_in.trailing.size() > 0)
+	{
+		cmd_out.message_set = true;
+		cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
+	}
 	return true;
 }
 
 // INVITE <nickname> <channel>
 bool Parser::validateInvite(ParsedCommand &cmd_in, Command &cmd_out)
 {
+	std::string str;
+	std::string::const_iterator it, end;
 	if (cmd_in.parameters.size() > 0)
 	{
-		std::string::const_iterator it = cmd_in.parameters[0].begin();
-		if (!nick(it) || *it != '\0')
+		str = cmd_in.parameters[0];
+		it = str.begin();
+		end = str.end();
+		if (!nick(it, end) || *it != '\0')
 			return false;
-		cmd_out.users.push_back(cmd_in.parameters[0]);
+		cmd_out.users.push_back(str);
 	}
 	if (cmd_in.parameters.size() > 1)
 	{
-		std::string::const_iterator it = cmd_in.parameters[1].begin();
-		if (!channel(it) || *it != '\0')
+		str = cmd_in.parameters[1];
+		it = str.begin();
+		end = str.end();
+		if (!channel(it, end) || *it != '\0')
 			return false;
-		cmd_out.channels.push_back(cmd_in.parameters[1]);
+		cmd_out.channels.push_back(str);
 	}
 	return true;
 }
@@ -198,14 +230,22 @@ bool Parser::validateInvite(ParsedCommand &cmd_in, Command &cmd_out)
 // TOPIC <channel> [<topic>]
 bool Parser::validateTopic(ParsedCommand &cmd_in, Command &cmd_out)
 {
+	std::string str;
+	std::string::const_iterator it, end;
 	if (cmd_in.parameters.size() > 0)
 	{
-		std::string::const_iterator it = cmd_in.parameters[0].begin();
-		if (!channel(it) || *it != '\0')
+		str = cmd_in.parameters[0];
+		it = str.begin();
+		end = str.end();
+		if (!channel(it, end) || *it != '\0')
 			return false;
-		cmd_out.channels.push_back(cmd_in.parameters[0]);
+		cmd_out.channels.push_back(str);
 	}
-	cmd_out.message = cmd_in.trailing;
+	if (cmd_in.trailing.size() > 0)
+	{
+		cmd_out.message_set = true;
+		cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
+	}
 	return true;
 }
 
@@ -220,31 +260,40 @@ bool Parser::validateMode(ParsedCommand &cmd_in, Command &cmd_out)
 // PART <channel>{,<channel>} [<reason>]
 bool Parser::validatePart(ParsedCommand &cmd_in, Command &cmd_out)
 {
-	std::string::const_iterator it, test;
+	std::string str;
+	std::string::const_iterator it, end, test;
 	if (cmd_in.parameters.size() > 0)
 	{
-		it = cmd_in.parameters[0].begin();
-		test = it;
-		if (!channel(test))
-			return false; // ?
-		cmd_out.channels.push_back(std::string(it, test));
-		it = test;
-		while (is_char(it, ','))
+		str = cmd_in.parameters[0];
+		it = str.begin();
+		end = str.end();
+		while (is_char(it, ',') || it == str.begin())
 		{
-			it++;
+			if (it != str.begin())
+				it++;
 			test = it;
-			channel(test);
+			if (!channel(test, end))
+				return false; // ?
 			cmd_out.channels.push_back(std::string(it, test));
+			it = test;
 		}
 	}
-	cmd_out.message = cmd_in.trailing;
+	if (cmd_in.trailing.size() > 0)
+	{
+		cmd_out.message_set = true;
+		cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
+	}
 	return true;
 }
 
 // QUIT <reason>
 bool Parser::validateQuit(ParsedCommand &cmd_in, Command &cmd_out)
 {
-	cmd_out.message = cmd_in.trailing;
+	if (cmd_in.trailing.size() > 0)
+	{
+		cmd_out.message_set = true;
+		cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
+	}
 	return true;
 }
 
@@ -402,7 +451,7 @@ bool Parser::middle(std::string::const_iterator &it)
 // <trailing> ::= <Any, possibly *empty*, sequence of octets not including NUL or CR or LF>
 bool Parser::trailing(std::string::const_iterator &it)
 {
-	while (is_in(it, std::string("\0\r\n", 3)))
+	while (!is_in(it, std::string("\0\r\n", 3)))
 	{
 		it++;
 	}
@@ -428,17 +477,17 @@ bool Parser::crlf(std::string::const_iterator &it)
 
 // TARGETS
 // <target>     ::= <to> [ "," <target> ]
-bool Parser::target(std::string::const_iterator &it)
+bool Parser::target(std::string::const_iterator &it, std::string::const_iterator &end)
 {
 	// _func_stack.push("target");
-	if (!to(it))
+	if (!to(it, end))
 	{
 		return false;
 	}
 	if (is_char(it,','))
 	{
 		it++;
-		if (!target(it))
+		if (!target(it, end))
 		{
 			return false;
 			// return (error(it));
@@ -448,30 +497,30 @@ bool Parser::target(std::string::const_iterator &it)
 }
 
 // <to>         ::= <channel> | <user> '@' <servername> | <nick> | <mask>
-bool Parser::to(std::string::const_iterator &it)
+bool Parser::to(std::string::const_iterator &it, std::string::const_iterator &end)
 {
 	// _func_stack.push("to");
-	if (!channel(it))
+	if (!channel(it, end))
 	{
-		if (user(it))
+		/* if (user(it, end))
 		{
 			if (!is_char(it, '@'))
 			{
 				return false;
 				// return (error(it));
 			}
-			if (!servername(it))
+			if (!servername(it, end))
 			{
 				return false;
 				// return (error(it));
 			}
 			return true;
 		}
-		else if (nick(it,))
+		else  */if (nick(it, end))
 		{
 			return true;
 		}
-		else if (mask(it))
+		else if (mask(it, end))
 		{
 			return true;
 		}
@@ -482,36 +531,36 @@ bool Parser::to(std::string::const_iterator &it)
 }
 
 // <channel>    ::= ('#' | '&') <chstring>
-bool Parser::channel(std::string::const_iterator &it)
+bool Parser::channel(std::string::const_iterator &it, std::string::const_iterator &end)
 {
 	if (is_char(it,'#') == false && is_char(it, '&') == false)
 		return false;
 	it++;
-	if (!chstring(it))
+	if (!chstring(it, end))
 		return false;
 		// return error(it);
 	return true;
 }
 
 // <servername> ::= <host>
-bool Parser::servername(std::string::const_iterator &it)
+bool Parser::servername(std::string::const_iterator &it, std::string::const_iterator &end)
 {
-	return host(it);
+	return host(it, end);
 }
 
 // <host>       ::= see RFC 952 [DNS:4] for details on allowed hostnames
 // <hname>      ::= <name>*["."<name>]
 // <name>       ::= <letter>[*[<let-or-digit-or-hyphen>]<let-or-digit>]
-bool Parser::host(std::string::const_iterator &it)
+bool Parser::host(std::string::const_iterator &it, std::string::const_iterator &end)
 {
 	// _func_stack.push("host");
-	if (!name(it))
+	if (!name(it, end))
 		return false;
 	std::string::const_iterator test = it;
 	while (is_char(it, '.'))
 	{
 		test++;
-		if (!name(test))
+		if (!name(test, end))
 			return false;
 			// return (error(it));
 	}
@@ -519,7 +568,7 @@ bool Parser::host(std::string::const_iterator &it)
 }
 
 // <name>       ::= <letter> [*[let-or-digit-or-hyphen]<let-or-digit>]
-bool Parser::name(std::string::const_iterator &it)
+bool Parser::name(std::string::const_iterator &it, std::string::const_iterator &end)
 {
 	// _func_stack.push("name");
 	if (!letter(it))
@@ -527,7 +576,7 @@ bool Parser::name(std::string::const_iterator &it)
 		return false;
 	}
 	it++;
-	while (letter(it) || number(it) || is_char(it, '-'))
+	while (it != end && (letter(it) || number(it) || is_char(it, '-')))
 	{
 		std::string::const_iterator test = it;
 		if (is_char(it, '-'))
@@ -562,23 +611,23 @@ bool Parser::nick(std::string::const_iterator &it, std::string::const_iterator &
 }
 
 // <mask>       ::= ('#' | '$') <chstring>
-bool Parser::mask(std::string::const_iterator &it)
+bool Parser::mask(std::string::const_iterator &it, std::string::const_iterator &end)
 {
 	if (is_char(it,'#') == false && is_char(it, '$') == false)
 		return false;
-	if (!chstring(it))
+	if (!chstring(it, end))
 		return false;
 	return true;
 }
 
 // <chstring>   ::= <any 8bit code except SPACE, BELL, NUL, CR, LF and comma (',')>
-bool Parser::chstring(std::string::const_iterator &it)
+bool Parser::chstring(std::string::const_iterator &it, std::string::const_iterator &end)
 {
 	std::string exclusion_string = std::string(" \b\0\r\n,", 6);
 	if (is_in(it, exclusion_string))
 		return false;
 	it++;
-	while (!is_in(it, exclusion_string))
+	while (it != end && !is_in(it, exclusion_string))
 	{
 		it++;
 		continue ;
@@ -588,15 +637,15 @@ bool Parser::chstring(std::string::const_iterator &it)
 
 // OTHER
 // <user>       ::= <nonwhite> { <nonwhite> }
-bool Parser::user(std::string::const_iterator &it)
+bool Parser::user(std::string::const_iterator &it, std::string::const_iterator &end)
 {
 	if (!nonwhite(it))
 	{
 		return false;
 	}
-	while (nonwhite(it))
+	while (it != end && nonwhite(it))
 	{
-		continue;
+		it++;
 	}
 	return true;
 }
@@ -621,17 +670,14 @@ bool Parser::number(std::string::const_iterator &it)
 bool Parser::special(std::string::const_iterator &it)
 {
 	if (is_in(it, std::string("-[]\\`^{}", 8)))
-	{
-		it++;
 		return true;
-	}
-	return true;
+	return false;
 }
 
 // <nonwhite>   ::= <any 8bit code except SPACE (0x20), NUL (0x0), CR (0xd), and LF (0xa)>
 bool Parser::nonwhite(std::string::const_iterator &it)
 {
-	return is_in(it, std::string(" \0\r\n", 4));
+	return (!is_in(it, std::string(" \0\r\n", 4)));
 }
 
 

@@ -63,29 +63,33 @@ void test(std::string message)
 	cmd_out.command = "";
 	cmd_out.err_response = 0;
 	cmd_out.threw_error = false;
+	cmd_out.message_set = false;
 	cmd_out.message = "";
 	if (parser.message(input, cmd_out))	
 	{
 		std::cout << "Valid" << std::endl;
-		std::cout << "Command: \"" << cmd_out.command << "\"" << std::endl;
-		std::cout << "Users Count: " << cmd_out.users.size() << std::endl;
+		std::cout << "Command:        \"" << cmd_out.command << "\"" << std::endl;
+		std::cout << "Users Count:     " << cmd_out.users.size() << std::endl;
 		for (std::size_t i = 0; i < cmd_out.users.size(); i++)
 		{
-			std::cout << "[" << i << "]: \"" << cmd_out.users[i] << "\"" << std::endl;
+			std::cout << "    [" << i << "]:            \"" << cmd_out.users[i] << "\"" << std::endl;
 		}
-		std::cout << "Channel Count: " << cmd_out.channels.size() << std::endl;
+		std::cout << "Channel Count:   " << cmd_out.channels.size() << std::endl;
 		for (std::size_t i = 0; i < cmd_out.channels.size(); i++)
 		{
-			std::cout << "[" << i << "]: \"" << cmd_out.channels[i] << "\"" << std::endl;
+			std::cout << "    [" << i << "]:            \"" << cmd_out.channels[i] << "\"" << std::endl;
 		}
-		std::cout << "Key Count: " << cmd_out.keys.size() << std::endl;
+		std::cout << "Key Count:       " << cmd_out.keys.size() << std::endl;
 		for (std::size_t i = 0; i < cmd_out.keys.size(); i++)
 		{
-			std::cout << "[" << i << "]: \"" << cmd_out.keys[i] << "\"" << std::endl;
+			std::cout << "    [" << i << "]:            \"" << cmd_out.keys[i] << "\"" << std::endl;
 		}
-		std::cout << "Message: \"" << cmd_out.command << "\"" << std::endl;
-		std::cout << "Threw Error: \"" << ((cmd_out.threw_error) ? "True" : "False") << "\"" << std::endl;
-		std::cout << "Error Code: " << cmd_out.err_response << std::endl;
+		std::cout << "Message Set:     " << ((cmd_out.message_set) ? "True" : "False") << std::endl;
+		if (cmd_out.message_set)
+			std::cout << "    Message:    \"" << cmd_out.message << "\"" << std::endl;	
+		std::cout << "Threw Error:     " << ((cmd_out.threw_error) ? "True" : "False") << std::endl;
+		if (cmd_out.threw_error)
+			std::cout << "    Error Code:  " << cmd_out.err_response << std::endl;
 	}
 	else
 		std::cout << "Invalid" << std::endl;;
@@ -94,14 +98,60 @@ void test(std::string message)
 
 int main(void)
 {
-	test("NICK Hal");
-	test("MOTD");
+	std::cout << "Testing JOIN" << std::endl;
 	test("JOIN #Blah");
-	test("KICK #Blah Hal");
 	test("JOIN #foo,#bar fubar,foobar");
+	test("JOIN #no-pass,#pass ,password");
+	test("JOIN #no-pass,#no-pass-2,#pass ,,password");
+	std::cout << std::endl;
+
+	std::cout << "Testing NICK" << std::endl;
+	test("NICK Hal");
+	std::cout << std::endl;
+
+	std::cout << "Testing PRIVMSG" << std::endl;
+	test("PRIVMSG Jeremy,Hiro :Hello there!");
+	test("PRIVMSG Angel :yes I'm receiving it !receiving it !'u>(768u+1n) .br");
+	std::cout << std::endl;
+
+	std::cout << "Testing KICK" << std::endl;
+	test("KICK #Blah Hal");
+	std::cout << std::endl;
+
+	std::cout << "Testing INVITE" << std::endl;
+	test("INVITE Wiz #Twilight_Zone");
+	std::cout << std::endl;
+
+	std::cout << "Testing TOPIC" << std::endl;
+	test("TOPIC #test :another topic");
+	test("TOPIC #test :");
+	test("TOPIC #test");
+	std::cout << std::endl;
+
+	std::cout << "Testing MODE" << std::endl;
 	test("MODE #test");
 	test("MODE #blah +o User");
-	test("PRIVMSG Jeremy,Hiro Hello there!");
-	test("PART #test,#test2 Logging off");
+	std::cout << std::endl;
+
+	std::cout << "Testing PART" << std::endl;
+	test("PART #test,#test2 :Logging off");
+	test("PART #twilight_zone ");
+	test("PART #oz-ops,&group5");
+	std::cout << std::endl;
+
+	std::cout << "Testing QUIT" << std::endl;
+	test("QUIT :Gone to have lunch");
+	std::cout << std::endl;
+
+	std::cout << "Testing other" << std::endl;
+	test("MOTD");
+	std::cout << std::endl;
+	
+	
+	
+	
+	
+	
+	
 	return 0;
 }
