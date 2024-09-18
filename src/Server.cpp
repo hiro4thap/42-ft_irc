@@ -180,6 +180,8 @@ void	Server::sendClient(std::string message, int toFd)
 
 void	Server::processCommand(std::string command, int fromFd)
 {
+	// if (command.size() >= 3 && command.substr(0,3) == "CAP")
+	// 	return ;
 	Command cmd;
 	cmd.command = "";
 	cmd.err_response = 0;
@@ -201,99 +203,12 @@ void	Server::processCommand(std::string command, int fromFd)
 	Parser parser;
 
 	parser.message(command, cmd);
-	
-	try
+
+	std::map<std::string, void(Server::*)(const Command&, int)>::iterator command_function = commands.find(cmd.command);
+	if (command_function != commands.end())
 	{
-		void (Server::*f)(const Command&, int) = commands[cmd.command];
-		(*this.*f)(cmd, fromFd);
+		(this->*(command_function->second))(cmd, fromFd);
 	}
-	catch (std::exception e)
-	{
-
-	}
-
-
-	// std::vector<std::string> tokens = tokenise(command.substr(0, command.size() - 2));
-	// // NICK command
-	// // void			setNickname(const std::string &nickname, int fd);
-	// if (cmd.command == "NICK")
-	// {
-	// 	setNickname(tokens[1], fromFd);
-	// }
-
-	// // JOIN command
-	// // void			joinChannel(const std::string &channel, int fd, const std::string &password = "");
-	// else if (tokens[0] == "JOIN")
-	// {
-	// 	if (tokens.size() > 2)
-	// 		joinChannel(tokens[1], fromFd, tokens[2]);
-	// 	else
-	// 		joinChannel(tokens[1], fromFd);
-	// }
-
-	// // PRIVMSG command
-	// // void			sendToChannel(const std::string &channel, const std::string &message ,int fd);
-	// // void			sendToUser(const std::string &user, const std::string &message, int fd);
-	// else if (tokens[0] == "PRIVMSG")
-	// {
-	// 	if (tokens[1].at(0) == '#' || tokens[1].at(0) == '&')
-	// 	{
-	// 		sendToChannel(tokens[1], command.substr(5 + tokens[1].size() + 1, std::string::npos), fromFd);
-	// 	}
-	// 	else
-	// 	{
-	// 		sendToUser(tokens[1], command.substr(5 + tokens[1].size() + 1, std::string::npos), fromFd);
-	// 	}
-	// }
-
-	// // KICK command
-	// // void			kickUser(const std::string &user, int fd, const std::string &comment = "");&
-	// else if (tokens[0] == "KICK")
-	// {
-	// 	if (tokens.size() > 2)
-	// 		kickUser(tokens[1], tokens[2], fromFd, command.substr(5 + tokens[1].size() + tokens[2].size() + 2, std::string::npos));
-	// 	else
-	// 		kickUser(tokens[1], tokens[2], fromFd);
-	// }
-
-	// // INVITE command
-	// // void			inviteUser(const std::string &channel, const std::string &user, int fd);
-	// else if (tokens[0] == "INVITE")
-	// {
-	// 	if (tokens.size() == 1)
-	// 		inviteUser("", "", fromFd);
-	// 	else
-	// 		inviteUser(tokens[2], tokens[1], fromFd);
-	// }
-
-	// // TOPIC command
-	// // void			setTopic(const std::string &channel, int fd, const std::string topic = "");
-	// else if (tokens[0] == "TOPIC")
-	// {
-	// 	if (tokens.size() > 2)
-	// 		setTopic(tokens[1], fromFd, tokens[2]);
-	// 	else
-	// 		setTopic(tokens[1], fromFd);
-	// }	
-
-	// // MODE command
-	// // void			setMode(const std::string &channel, const char mode, int fd, const std::string &limit, const std::string &user);
-	// else if (tokens[0] == "MODE")
-	// {
-	// 	if (tokens.size() == 2) //TODO: return modes which are on currently
-	// 		return ;
-	// 	setMode(tokens[1], tokens[2], fromFd, command.substr(tokens[0].size() + tokens[1].size() + tokens[2].size() + 3, std::string::npos));
-	// }
-
-	// // PART command
-	// // void			leaveChannel(const std::string &channel, int fd, const std::string &reason);
-	// else if (tokens[0] == "PART")
-	// {
-	// 	if (tokens.size() > 2)
-	// 		leaveChannel(tokens[1], fromFd, command.substr(tokens[0].size() + tokens[1].size() + 2, std::string::npos));
-	// 	else
-	// 		leaveChannel(tokens[1], fromFd);
-	// }
 
 	// // QUIT command
 	// // void			quitServer(int fd, const std::string &comment = "");
@@ -735,6 +650,9 @@ void	Server::quitServer(const Command &cmd, int fromFd)
 	sendAllClients(message, fromFd);
 	if (_users.find(fromFd) != _users.end()) //TODO:remove operators and invited as well
 		_users.erase(fromFd);
+
+
+	delFromPfds(fromFd);
 }
 
 void	Server::sendChannel(std::string response, const std::string &channel, int fromFd)
