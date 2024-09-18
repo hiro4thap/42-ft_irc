@@ -134,6 +134,7 @@ int main(void)
 
 	std::cout << "Testing INVITE" << std::endl;
 	test("INVITE Wiz #Twilight_Zone");
+	test("INVITE");
 	std::cout << std::endl;
 
 	std::cout << "Testing TOPIC" << std::endl;
@@ -154,6 +155,8 @@ int main(void)
 	test("MODE #a +o-o test test2");
 	test("MODE #a -o+o test test2");
 	test("MODE #a -k+i-i pass test");
+	test("MODE #a -t.,/123k pass");
+	test("MODE #a -t.,/1+23k pass");
 	std::cout << std::endl;
 
 	std::cout << "Testing PART" << std::endl;

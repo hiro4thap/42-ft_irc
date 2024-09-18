@@ -56,14 +56,13 @@ bool Parser::validateCommand(ParsedCommand &cmd_in, Command &cmd_out)
 	commands["PART"] = &validatePart;
 	commands["QUIT"] = &validateQuit;
 
-	try
+	std::map<std::string, bool(*)(ParsedCommand&, Command&)>::iterator command_function = commands.find(cmd_in.command);
+
+	if (command_function != commands.end())
 	{
-		return (commands[cmd_in.command])(cmd_in, cmd_out);
+		return (command_function->second)(cmd_in, cmd_out);
 	}
-	catch (std::exception e)
-	{
-		return false;
-	}
+	return true; // ?
 }
 
 // JOIN <channel>{,<channel>} [<key>{,<key>}]
@@ -287,7 +286,7 @@ bool Parser::modestring(std::string &modestring, Command &cmd_out)
 
 	it = modestring.begin();
 	end = modestring.end();
-	while (it != end && is_in(it, "+-lokit"))
+	while (it != end)
 	{
 		if (is_in(it, "+-"))
 			operation = *it;
@@ -300,8 +299,6 @@ bool Parser::modestring(std::string &modestring, Command &cmd_out)
 		}
 		it++;
 	}
-	if (it != end)
-		return false;
 	return true;
 }
 
@@ -371,10 +368,11 @@ bool Parser::message(std::string message, Command &cmd_out)
 	if (_supported_commands.find(cmd_in.command) == _supported_commands.end())
 		return false;
 	it = test;
-	if (!params(it, cmd_in))
-	{
-		return (error(it));
-	}
+	params(it, cmd_in);
+	// if (!params(it, cmd_in))
+	// {
+	// 	return (error(it));
+	// }
 	if (!crlf(it))
 	{
 		return (error(it));
