@@ -330,7 +330,7 @@ void	Server::joinChannel(const Command &cmd, int fromFd)
 		sendClient(message, fromFd);
 	}
 	// 332 RPL_TOPIC
-	// TODO: 333 RPL_TOPICWHOTIME
+	// 333 RPL_TOPICWHOTIME
 	// 353 RPL_NAMREPLY
 	// 366 RPL_ENDOFNAMES
 	else if (!ch) //create new one
@@ -341,10 +341,13 @@ void	Server::joinChannel(const Command &cmd, int fromFd)
 		_channels.push_back(new_channel);
 		sendChannel(":" + _users[fromFd] + " JOIN " + channel_name, channel_name, fromFd);
 		sendClient(":" + _users[fromFd] + " JOIN " + channel_name, fromFd);
-		if (new_channel.getTopic().empty())
+		if (new_channel.getTopicSetAt().empty())
 			sendClient(":server 331 " + _users[fromFd] + " " + channel_name + " :" + "No topic is set", fromFd);
 		else
-			sendClient(":server 332 " + _users[fromFd] + " " + channel_name + " :" + ch->getTopic(), fromFd);
+		{
+			sendClient(":server 332 " + _users[fromFd] + " " + channel_name + " :" + new_channel.getTopic(), fromFd);
+			sendClient(":server 333 " + _users[fromFd] + " " + channel_name + " " + new_channel.getTopicSetBy() + " " + new_channel.getTopicSetAt(), fromFd);
+		}
 		sendClient(":server 353 " + _users[fromFd] + " = " + channel_name + " :@" + _users[fromFd], fromFd);
 		sendClient(":server 366 " + _users[fromFd] + " " + channel_name + " :End of NAMES list", fromFd);
 	}
@@ -355,10 +358,13 @@ void	Server::joinChannel(const Command &cmd, int fromFd)
 		ch->addUser(_users[fromFd]);
 		sendChannel(":" + _users[fromFd] + " JOIN " + channel_name, channel_name, fromFd);
 		sendClient(":" + _users[fromFd] + " JOIN " + channel_name, fromFd);
-		if (ch->getTopic().empty())
+		if (ch->getTopicSetAt().empty())
 			sendClient(":server 331 " + _users[fromFd] + " " + channel_name + " :" + "No topic is set", fromFd);
 		else
+		{
 			sendClient(":server 332 " + _users[fromFd] + " " + channel_name + " :" + ch->getTopic(), fromFd);
+			sendClient(":server 333 " + _users[fromFd] + " " + channel_name + " " + ch->getTopicSetBy() + " " + ch->getTopicSetAt(), fromFd);
+		}
 		sendClient(":server 353 " + _users[fromFd] + " = " + channel_name + " :" + getNameList(ch), fromFd);
 		sendClient(":server 366 " + _users[fromFd] + " " + channel_name + " :End of NAMES list", fromFd);
 	}
@@ -589,13 +595,16 @@ void	Server::processTopic(const Command &cmd, int fromFd)
 
 	// 331 RPL_NOTOPIC
 	// 332 RPL_TOPIC
-	// TODO: 333 RPL_TOPICWHOTIME
+	// 333 RPL_TOPICWHOTIME
 	else if (cmd.message_set == false)
 	{
-		if (ch->getTopic().empty()) // Needs to query if topic has been modified.
+		if (ch->getTopicSetAt().empty())
 			sendClient(":server 331 " + _users[fromFd] + " " + channel_name + " :" + "No topic is set", fromFd);
 		else
+		{
 			sendClient(":server 332 " + _users[fromFd] + " " + channel_name + " :" + ch->getTopic(), fromFd);
+			sendClient(":server 333 " + _users[fromFd] + " " + channel_name + " " + ch->getTopicSetBy() + " " + ch->getTopicSetAt(), fromFd);
+		}
 	}
 	// 482 ERR_CHANOPRIVSNEEDED
 	else if (ch && ch->getHasRestrictTopic() && Channel::containsUser(ch->getOperators(), _users[fromFd]) == false)
@@ -605,7 +614,7 @@ void	Server::processTopic(const Command &cmd, int fromFd)
 	}
 	else
 	{
-		ch->setTopic(cmd.message);
+		ch->setTopic(cmd.message, _users[fromFd]);
 		sendClient(":" + _users[fromFd] + " TOPIC " + channel_name + " " + cmd.message, fromFd);
 		sendChannel(":" + _users[fromFd] + " TOPIC " + channel_name + " " + cmd.message, channel_name, fromFd);
 	}
@@ -648,10 +657,17 @@ void	Server::quitServer(const Command &cmd, int fromFd)
 	sendClient(message, fromFd);
 	message = ":" + _users[fromFd] + " QUIT :Quit " + cmd.message;
 	sendAllClients(message, fromFd);
-	if (_users.find(fromFd) != _users.end()) //TODO:remove operators and invited as well
+	for (std::size_t i = 0; i < _channels.size(); i++)
+	{
+		if (Channel::containsUser(_channels[i].getUsers(), _users[fromFd]))
+			_channels[i].removeUser(_users[fromFd]);		
+		if (Channel::containsUser(_channels[i].getOperators(), _users[fromFd]))
+			_channels[i].removeOperator(_users[fromFd]);		
+		if (Channel::containsUser(_channels[i].getInvitedUsers(), _users[fromFd]))
+			_channels[i].removeInvitedUser(_users[fromFd]);		
+	}
+	if (_users.find(fromFd) != _users.end())
 		_users.erase(fromFd);
-
-
 	delFromPfds(fromFd);
 }
 

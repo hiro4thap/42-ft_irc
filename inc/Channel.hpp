@@ -2,6 +2,7 @@
 # define CHANNEL_HPP
 
 # include <iostream>
+# include <sstream>
 # include <vector>
 
 typedef std::vector<std::string>::const_iterator user_it; 
@@ -12,10 +13,12 @@ public:
 	Channel(const std::string name);
 	~Channel();
 	const std::string	&getName() const;
-	void				setTopic(const std::string topic);
+	void				setTopic(const std::string &topic, const std::string &setter);
 	const std::string	&getTopic() const;
-	void				setPassword(const std::string password);
-	bool				checkPassword(const std::string password) const;
+	const std::string	&getTopicSetBy() const;
+	const std::string	&getTopicSetAt() const;
+	void				setPassword(const std::string &password);
+	bool				checkPassword(const std::string &password) const;
 	void				setIsInviteOnly(bool value);
 	bool				getIsInviteOnly() const;
 	void				setHasRestrictTopic(bool value);
@@ -42,6 +45,8 @@ public:
 private:
 	std::string	_name;
 	std::string	_topic;
+	std::string	_topic_set_by;
+	std::string	_topic_set_at;
 	std::string	_password;
 	std::size_t	_limit;
 	bool		_is_invite_only;		//i

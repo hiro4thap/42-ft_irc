@@ -18,9 +18,13 @@ const std::string	&Channel::getName() const
 	return _name;
 }
 
-void	Channel::setTopic(const std::string topic)
+void	Channel::setTopic(const std::string &topic, const std::string &setter)
 {
 	_topic = topic;
+	_topic_set_by = setter;
+	std::stringstream	ss;
+	ss << std::time(0);
+	_topic_set_at = ss.str();
 }
 
 const std::string	&Channel::getTopic() const
@@ -28,12 +32,22 @@ const std::string	&Channel::getTopic() const
 	return _topic;
 }
 
-void	Channel::setPassword(const std::string password)
+const std::string	&Channel::getTopicSetBy() const
+{
+	return _topic_set_by;
+}
+
+const std::string	&Channel::getTopicSetAt() const
+{
+	return _topic_set_at;
+}
+
+void	Channel::setPassword(const std::string &password)
 {
 	_password = password;
 }
 
-bool	Channel::checkPassword(const std::string password) const
+bool	Channel::checkPassword(const std::string &password) const
 {
 	return (_password == password);
 }
