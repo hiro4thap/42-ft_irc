@@ -18,6 +18,7 @@ public:
 	const std::string	&getTopicSetBy() const;
 	const std::string	&getTopicSetAt() const;
 	void				setPassword(const std::string &password);
+	const std::string	&getPassword() const;
 	bool				checkPassword(const std::string &password) const;
 	void				setIsInviteOnly(bool value);
 	bool				getIsInviteOnly() const;

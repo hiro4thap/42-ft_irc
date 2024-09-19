@@ -47,6 +47,11 @@ void	Channel::setPassword(const std::string &password)
 	_password = password;
 }
 
+const std::string	&Channel::getPassword() const
+{
+	return _password;
+}
+
 bool	Channel::checkPassword(const std::string &password) const
 {
 	return (_password == password);

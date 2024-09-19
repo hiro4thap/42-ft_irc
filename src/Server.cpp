@@ -385,37 +385,164 @@ void	Server::processMode(const Command &cmd, int fromFd)
 	}
 
 	// 442 ERR_NOTONCHANNEL
-	else if (Channel::containsUser(ch->getUsers(), _users[_pfds->fd]) == false)
+	else if (ch && Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
 	{
 		std::string message = channel_name + " :You're not on that channel";
 		sendClient(message, fromFd);
 	}
 
+	// 324 RPL_CHANNELMODEIS
+	else if (ch && cmd.mode_operations.size() == 0)
+	{
+		std::string message = ":server 324 " + _users[fromFd] + " " + channel_name;
+		std::string	limit_arg = "";
+		std::string	password_arg = "";
+		std::string mode_list = "";
+		if (ch->getIsInviteOnly())
+			mode_list += "i";
+		if (ch->getHasPassword())
+			mode_list += "k";
+		if (ch->getHasLimit())
+		{
+			mode_list += "l";
+			limit_arg = " " + std::to_string(ch->getLimit());
+		}
+		if (ch->getHasRestrictTopic())
+		{
+			mode_list += "t";
+			password_arg = " " + ch->getPassword();
+		}
+		if (mode_list.size() > 0)
+			message += " +" + mode_list + limit_arg + password_arg;
+		sendClient(message, fromFd);
+	}
+
 	// 482 ERR_CHANOPRIVSNEEDED
-	else if (Channel::containsUser(ch->getOperators(), _users[_pfds->fd]) == false)
+	else if (ch && Channel::containsUser(ch->getOperators(), _users[fromFd]) == false)
 	{
 		std::string message = channel_name + " :You're not channel operator";
 		sendClient(message, fromFd);
 	}
 
-	// 324 RPL_CHANNELMODEIS
-	else if (cmd.mode_operations.size() == 0)
+	// SET MODES
+	else
 	{
-		std::string message = channel_name;
-		std::string mode_list = "";
-		if (ch->getIsInviteOnly())
-			mode_list += "i";
-		if (ch->getHasRestrictTopic())
-			mode_list += "t";
-		if (ch->getHasPassword())
-			mode_list += "k";
-		if (ch->getHasLimit())
-			mode_list += "l";
-		if (mode_list.size() > 0)
-			message += " +" + mode_list;
+		std::size_t index = 0;
+		std::string	processed_operations;
+		std::string	processed_parameters;
+		for (std::vector<std::string>::const_iterator it = cmd.mode_operations.cbegin(); it < cmd.mode_operations.cend(); it++)
+		{
+			if (*it == "+i")
+			{
+				ch->setIsInviteOnly(true);
+				processed_operations += *it;
+			}
+			else if (*it == "-i")
+			{
+				ch->setIsInviteOnly(false);
+				processed_operations += *it;
+			}
+			else if (*it == "+k")
+			{
+				if (cmd.mode_parameters.size() <= index)
+					continue ;
+				ch->setHasPassword(true);
+				ch->setPassword(cmd.mode_parameters[index]);
+				processed_operations += *it;
+				processed_parameters += cmd.mode_parameters[index];
+				index++;
+			}
+			else if (*it == "-k")
+			{
+				if (cmd.mode_parameters.size() <= index || !checkPassword(cmd.mode_parameters[index]))
+				{
+					index++;
+					continue ;
+				}
+				ch->setHasPassword(true);
+				ch->setPassword(cmd.mode_parameters[index]);
+				processed_operations += *it;
+				processed_parameters += cmd.mode_parameters[index];
+				index++;
+			}
+			else if (*it == "+l")
+			{
+				if (cmd.mode_parameters.size() <= index)
+					continue ;
+				std::stringstream ss(cmd.mode_parameters[index]);
+				std::size_t limit;
+				ss >> limit;
+				ch->setHasLimit(true);
+				ch->setLimit(limit);
+				processed_operations += *it;
+				processed_parameters += cmd.mode_parameters[index];
+				index++;
+			}
+			else if (*it == "-l")
+			{
+				ch->setHasLimit(false);
+				processed_operations += *it;
+			}
+			else if (*it == "+o")
+			{
+				// 401 ERR_NOSUCHNICK
+				if (!userExists(cmd.mode_parameters[index]))
+				{
+					std::string	message = ":serever 401 " + _users[fromFd] + " " + cmd.mode_parameters[index] + " :No such nick/channel";
+					sendClient(message, fromFd);
+					index++;
+					continue ;
+				}
+				if (!Channel::containsUser(ch->getUsers(), cmd.mode_parameters[index]) || Channel::containsUser(ch->getOperators(), cmd.mode_parameters[index]))
+				{
+					index++;
+					continue ;
+				}
+				ch->addOperator(cmd.mode_parameters[index]);
+				processed_operations += *it;
+				processed_parameters += cmd.mode_parameters[index];
+				index++;
+			}
+			else if (*it == "-o")
+			{
+				// 401 ERR_NOSUCHNICK
+				if (!userExists(cmd.mode_parameters[index]))
+				{
+					std::string	message = ":serever 401 " + _users[fromFd] + " " + cmd.mode_parameters[index] + " :No such nick/channel";
+					sendClient(message, fromFd);
+					index++;
+					continue ;
+				}
+				if (!Channel::containsUser(ch->getUsers(), cmd.mode_parameters[index]) || !Channel::containsUser(ch->getOperators(), cmd.mode_parameters[index]))
+				{
+					index++;
+					continue ;
+				}
+				ch->removeOperator(cmd.mode_parameters[index]);
+				processed_operations += *it;
+				processed_parameters += cmd.mode_parameters[index];
+				index++;
+			}
+			else if (*it == "+t")
+			{
+				ch->setHasRestrictTopic(true);
+				processed_operations += *it;
+			}
+			else if (*it == "-t")
+			{
+				ch->setHasRestrictTopic(false);
+				processed_operations += *it;
+			}
+			else
+			{
+				std::string	message = ":server 472 " + _users[fromFd] + " " + (*it)[1] + " :is unkonw mode char to me"; 
+				sendClient(message, fromFd);
+			}
+		}
+		std::string	message = ":" + _users[fromFd] + " MODE " + channel_name + " " + processed_operations + " " + processed_parameters;
 		sendClient(message, fromFd);
+		sendChannel(message, channel_name, fromFd);
 	}
-
 	// 461 ERR_NEEDMOREPARAMS
 	// 472 ERR_UNKNOWNMODE
 	// 401 ERR_NOSUCHNICK
@@ -621,7 +748,7 @@ void	Server::processTopic(const Command &cmd, int fromFd)
 }
 
 // PART command
-void	Server::leaveChannel(const Command &cmd, int fromFd)
+void	Server::leaveChannel(const Command &cmd, int fromFd) //TODO: remove channel if empty
 {
 	Channel	*ch;
 	std::string channel_name = "";

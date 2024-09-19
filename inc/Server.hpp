@@ -10,6 +10,7 @@
 # include <vector>
 # include <map>
 # include <sstream>
+# include <string>
 
 class	Server
 {
