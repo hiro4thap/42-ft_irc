@@ -31,6 +31,7 @@
 // fcntl
 # include <fcntl.h>
 
+# include "Log.hpp"
 # include "Parser.hpp"
 
 

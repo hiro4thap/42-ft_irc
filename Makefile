@@ -11,7 +11,8 @@ INCS		= -Iinc/
 SRC			= main.cpp \
 			  Server.cpp \
 			  Channel.cpp \
-			  Parser.cpp
+			  Parser.cpp \
+			  Log.cpp
 
 OBJ			= $(SRC:.cpp=.o)
 
