@@ -748,7 +748,7 @@ void	Server::processTopic(const Command &cmd, int fromFd)
 }
 
 // PART command
-void	Server::leaveChannel(const Command &cmd, int fromFd) //TODO: remove channel if empty
+void	Server::leaveChannel(const Command &cmd, int fromFd)
 {
 	Channel	*ch;
 	std::string channel_name = "";
@@ -771,6 +771,8 @@ void	Server::leaveChannel(const Command &cmd, int fromFd) //TODO: remove channel
 	else
 	{
 		ch->removeUser(_users[fromFd]);
+		if (ch->getUsers().size() == 0)
+			removeChannel(channel_name);
 		std::string message = ":" + _users[fromFd] + " PART " + channel_name + " " + cmd.message;
 		sendClient(message, fromFd);
 		sendChannel(message, channel_name, fromFd);
@@ -792,6 +794,8 @@ void	Server::quitServer(const Command &cmd, int fromFd)
 			_channels[i].removeOperator(_users[fromFd]);		
 		if (Channel::containsUser(_channels[i].getInvitedUsers(), _users[fromFd]))
 			_channels[i].removeInvitedUser(_users[fromFd]);		
+		if (_channels[i].getUsers().size() == 0)
+			removeChannel(_channels[i].getName());
 	}
 	if (_users.find(fromFd) != _users.end())
 		_users.erase(fromFd);
@@ -843,4 +847,12 @@ const std::string	Server::getInvitedChannels(const std::string &user) const
 		channels += _channels[i].getName();
 	}
 	return channels;
+}
+
+void	Server::removeChannel(const std::string channel)
+{
+	Channel *ch = getChannelByName(channel);
+	if (!ch)
+		return ;
+	_channels.erase(std::remove(_channels.begin(), _channels.end(), *ch), _channels.end());
 }
