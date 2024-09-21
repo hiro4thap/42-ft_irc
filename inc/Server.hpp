@@ -35,7 +35,7 @@ private:
 	bool			checkPassword(const std::string &password) const;
 	Channel			*getChannelByName(const std::string &name);
 
-
+	void			sendError(enum Replies err_code, const Command &cmd, int requesting_client_fd, std::string extra_prefix = "");
 	/* // NICK command
 	void			setNickname(const std::string &nickname, int fd);
 	// JOIN command
