@@ -639,21 +639,26 @@ bool Parser::name(std::string::const_iterator &it, std::string::const_iterator &
 	return true;
 }
 
-// <nick>       ::= <letter> { <letter> | <number> | <special> }
+// <nick>       ::= (<letter> | <special>) *8{ <letter> | <number> | <special> | '-' }
 bool Parser::nick(std::string::const_iterator &it, std::string::const_iterator &end)
 {
-	if (!letter(it))
+	int count = 0;
+	if (!(letter(it) || special(it)))
 	{
 		return false;
 	}
 	it++;
-	while (letter(it) || number(it) || special(it))
+	count++;
+	while ((letter(it) || number(it) || special(it)))
 	{
 		it++;
+		count++;
 		if (it == end)
 			break ;
 		continue;
 	}
+	if (count >= 8)
+		return false;
 	return true;
 }
 
@@ -713,10 +718,10 @@ bool Parser::number(std::string::const_iterator &it)
 	return false;
 }
 
-// <special>    ::= '-' | '[' | ']' | '\' | '`' | '^' | '{' | '}'
+// <special>    ::= '[' | ']' | '\' | '`' | '_' | '^' | '{' | '|' | '}'
 bool Parser::special(std::string::const_iterator &it)
 {
-	if (is_in(it, std::string("-[]\\`^{}", 8)))
+	if (is_in(it, std::string("[]\\`_^{|}", 9)))
 		return true;
 	return false;
 }
