@@ -209,6 +209,11 @@ void	Server::processCommand(std::string command, int fromFd)
 	{
 		(this->*(command_function->second))(cmd, fromFd);
 	}
+	else if (_users.find(fromFd) == _users.end())
+	{
+		std::string	message = ":server 451 " + cmd.command + " :You have not registered";
+		sendClient(message, fromFd);
+	}
 
 	// // QUIT command
 	// // void			quitServer(int fd, const std::string &comment = "");
