@@ -11,6 +11,7 @@ Parser::Parser()
 	_supported_commands.insert("MODE");		// MODE <target> [<modestring> [<mode arguments>...]]
 	_supported_commands.insert("PART");		// PART <channel>{,<channel>} [<reason>]
 	_supported_commands.insert("QUIT");		// QUIT <reason>
+	_supported_commands.insert("PASS");		// PASS <password>
 }
 
 
@@ -55,6 +56,7 @@ bool Parser::validateCommand(ParsedCommand &cmd_in, Command &cmd_out)
 	commands["MODE"] = &validateMode;
 	commands["PART"] = &validatePart;
 	commands["QUIT"] = &validateQuit;
+	commands["PASS"] = &validatePass;
 
 	std::map<std::string, bool(*)(ParsedCommand&, Command&)>::iterator command_function = commands.find(cmd_in.command);
 
@@ -111,7 +113,6 @@ bool Parser::validateJoin(ParsedCommand &cmd_in, Command &cmd_out)
 // NICK <nickname>
 bool Parser::validateNick(ParsedCommand &cmd_in, Command &cmd_out)
 {
-
 	if (cmd_in.parameters.size() > 0)
 	{
 		std::string::const_iterator it = cmd_in.parameters[0].begin();
@@ -334,6 +335,17 @@ bool Parser::validatePart(ParsedCommand &cmd_in, Command &cmd_out)
 
 // QUIT <reason>
 bool Parser::validateQuit(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	if (cmd_in.trailing.size() > 0)
+	{
+		cmd_out.message_set = true;
+		cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
+	}
+	return true;
+}
+
+// PASS <password>
+bool Parser::validatePass(ParsedCommand &cmd_in, Command &cmd_out)
 {
 	if (cmd_in.trailing.size() > 0)
 	{

@@ -53,6 +53,7 @@ class Parser
 		static bool validateMode(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validatePart(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateQuit(ParsedCommand &cmd_in, Command &cmd_out);
+		static bool validatePass(ParsedCommand &cmd_in, Command &cmd_out);
 
 		// <prefix>   ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]
 		// bool prefix(std::string::const_iterator &it);

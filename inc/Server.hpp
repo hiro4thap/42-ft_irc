@@ -29,12 +29,12 @@ private:
 	unsigned int				_size;
 	std::vector<Channel>		_channels;
 	std::map<int, std::string>	_users;
+	std::vector<int>			_passed_fds;
 
 	void			addToPfds(int fd);
 	void			delFromPfds(int fromFd);
-	bool			checkPassword(const std::string &password) const;
 	Channel			*getChannelByName(const std::string &name);
-
+	bool			hasPassed(int fd);
 
 	/* // NICK command
 	void			setNickname(const std::string &nickname, int fd);
@@ -64,6 +64,7 @@ private:
 	void			processMode(const Command &cmd, int fromFd);
 	void			leaveChannel(const Command &cmd, int fromFd);
 	void			quitServer(const Command &cmd, int fromFd);
+	void			checkPassword(const Command &cmd, int fromFd);
 
 	void			processCommand(std::string command, int fd);
 	void			sendClient(std::string response, int toFd);
