@@ -68,7 +68,8 @@ void	Server::launch(int serverSocket)
 				if (clientSocket == -1)
 				{
 					perror("accept");
-					break ;
+					delFromPfds(_pfds[i].fd);
+					continue ;
 				}
 				addToPfds(clientSocket);
 			}
@@ -79,7 +80,8 @@ void	Server::launch(int serverSocket)
 				if (recv(_pfds[i].fd, buffer, sizeof(buffer), 0) == -1)
 				{
 					perror("recv");
-					break ;
+					delFromPfds(_pfds[i].fd);
+					continue ;
 				}
 				std::cout << "Message from client " << i << " :" << buffer << std::endl;
 				processCommand(buffer, _pfds[i].fd);
@@ -108,13 +110,24 @@ void	Server::addToPfds(int fd)
 
 void	Server::delFromPfds(int fromFd)
 {
+	for (std::size_t i = 0; i < _channels.size(); i++)
+	{
+		if (Channel::containsUser(_channels[i].getUsers(), _users[fromFd]))
+			_channels[i].removeUser(_users[fromFd]);		
+		if (Channel::containsUser(_channels[i].getOperators(), _users[fromFd]))
+			_channels[i].removeOperator(_users[fromFd]);		
+		if (Channel::containsUser(_channels[i].getInvitedUsers(), _users[fromFd]))
+			_channels[i].removeInvitedUser(_users[fromFd]);		
+		if (_channels[i].getUsers().size() == 0)
+			removeChannel(_channels[i].getName());
+	}
+	if (_users.find(fromFd) != _users.end())
+		_users.erase(fromFd);
 	for (std::size_t i = 0; i < _size; i++)
 	{
 		if (_pfds[i].fd != fromFd)
 			continue ;
 		close(_pfds[i].fd);
-		_pfds[i] = _pfds[_size - 1];
-		_size--;
 	}	
 }
 
@@ -184,27 +197,6 @@ void	Server::processCommand(std::string command, int fromFd)
 	// if (command.size() >= 3 && command.substr(0,3) == "CAP")
 	// 	return ;
 
-	// if not registered
-	//  if PASS -> check pass
-	//  elif NICK (if passed PASS, allowed)
-	//  (USER)
-	//  (CAP)
-	//
-	//  else 
-	//   send 451
-	//   return;
-	//
-	// else (if registered)
-	//  JOIN
-	//  NICK
-	//  PRIVMSG
-	//  KICK
-	//  INVITE
-	//  TOPIC
-	//  MODE
-	//  PART
-	//  QUIT
-	
 	Parser parser;
 
 	std::size_t pos_start = 0;
@@ -825,19 +817,6 @@ void	Server::quitServer(const Command &cmd, int fromFd)
 	sendClient(message, fromFd);
 	message = ":" + _users[fromFd] + " QUIT :Quit " + cmd.message;
 	sendAllClients(message, fromFd);
-	for (std::size_t i = 0; i < _channels.size(); i++)
-	{
-		if (Channel::containsUser(_channels[i].getUsers(), _users[fromFd]))
-			_channels[i].removeUser(_users[fromFd]);		
-		if (Channel::containsUser(_channels[i].getOperators(), _users[fromFd]))
-			_channels[i].removeOperator(_users[fromFd]);		
-		if (Channel::containsUser(_channels[i].getInvitedUsers(), _users[fromFd]))
-			_channels[i].removeInvitedUser(_users[fromFd]);		
-		if (_channels[i].getUsers().size() == 0)
-			removeChannel(_channels[i].getName());
-	}
-	if (_users.find(fromFd) != _users.end())
-		_users.erase(fromFd);
 	delFromPfds(fromFd);
 }
 
