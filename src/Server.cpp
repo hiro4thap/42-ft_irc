@@ -21,6 +21,12 @@ int	Server::getSocketFd()
     // creating socket
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 
+	int	optval = 1;
+	if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)))
+	{
+		perror("setsockopt");
+		return -1;
+	}
 	// convert socket non-blocking
 	fcntl(serverSocket, F_SETFL, O_NONBLOCK);
 
@@ -146,19 +152,6 @@ bool	Server::hasPassed(int fd)
 	std::vector<int>::iterator	it = std::find(_passed_fds.begin(), _passed_fds.end(), fd);
 	return (it != _passed_fds.end());
 }
-
-// bool	Server::removeChannelFromServer(Channel &channel)
-// {
-// 	for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); it++)
-// 	{
-// 		if(it->getName() == channel.getName())
-// 		{
-// 			_channels.erase(it);
-// 			return true;
-// 		}
-// 	}
-// 	return false;
-// }
 
 bool	Server::removeChannelFromServer(const std::string &channel_name)
 {
@@ -598,14 +591,14 @@ void	Server::sendMessage(const Command &cmd, int fromFd)
 	for (std::size_t i = 0; i < cmd.channels.size(); i++)
 	{
 		if (channelExists(cmd.channels[i]))
-			sendChannel(":" + _users[fromFd] + " PRIVMSG " + cmd.message, cmd.channels[0], fromFd);
+			sendChannel(":" + _users[fromFd] + " PRIVMSG " + cmd.channels[i] + " :" + cmd.message, cmd.channels[i], fromFd);
 		else
 			sendError(ERR_NOSUCHNICK, cmd, fromFd, cmd.channels[i]); // Docs suggest this, but ERR_NOSUCHCHANNEL seems more appropriate
 	}
 	for (std::size_t i = 0; i < cmd.users.size(); i++)
 	{
 		if (userExists(cmd.users[i]))
-			sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.message, getUserFd(cmd.users[0]));
+			sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.users[i] + " :" + cmd.message, getUserFd(cmd.users[i]));
 		else
 			sendError(ERR_NOSUCHNICK, cmd, fromFd, cmd.users[i]);
 	}
