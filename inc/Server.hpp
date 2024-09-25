@@ -12,6 +12,56 @@
 # include <sstream>
 # include <string>
 
+enum Replies
+{
+	RPL_NONE = 300,
+	RPL_NOTOPIC = 331,
+	RPL_TOPIC = 332,
+	RPL_NAMERPLY = 353,
+	RPL_ENDOFNAMES = 366,
+
+	ERR_NOSUCHNICK = 401,
+	ERR_NOSUCHCHANNEL = 403,
+	ERR_CANNOTSENDTOCHAN = 404,
+	ERR_TOOMANYCHANNELS = 405,
+	// ERR_TOOMANYTARGETS = 407,
+	// ERR_NOORIGIN = 409,
+	ERR_NORECIPIENT = 411,
+	ERR_NOTEXTTOSEND = 412,
+	// ERR_NOTOPLEVEL = 413,
+	// ERR_WILDTOPLEVEL = 414,
+	ERR_INPUTTOOLONG = 417,
+	ERR_UNKNOWNCOMMAND = 421,
+	ERR_NONICKNAMEGIVEN = 431,
+	ERR_ERRONEUSNICKNAME = 432,
+	ERR_NICKNAMEINUSE = 433,
+	// ERR_NICKCOLLISION = 436,
+	ERR_USERNOTINCHANNEL = 441,
+	ERR_NOTONCHANNEL = 442,
+	ERR_USERONCHANNEL = 443,
+	// ERR_USERDISABLED = 446,
+	ERR_NOTREGISTERED = 451,
+	ERR_NEEDMOREPARAMS = 461,
+	ERR_ALREADYREGISTRED = 462,
+	// ERR_NOPERMFORHOST = 463,
+	ERR_PASSWDMISMATCH = 464,
+	// ERR_YOUREBANNEDCREEP = 465,
+	// ERR_KEYSET = 467,
+	ERR_CHANNELISFULL = 471,
+	ERR_UNKNOWNMODE = 472,
+	ERR_INVITEONLYCHAN = 473,
+	// ERR_BANNEDFROMCHAN = 474,
+	ERR_BADCHANNELKEY = 475,
+	ERR_BADCHANMASK = 476,
+	ERR_NOPRIVILEGES = 481,
+	ERR_CHANOPRIVSNEEDED = 482,
+
+	ERR_UMODEUNKNOWNFLAG = 501,
+	// ERR_USERSDONTMATCH = 502,
+
+	ERR_INVALIDKEY = 525
+};
+
 class	Server
 {
 public:
@@ -34,27 +84,10 @@ private:
 	void			delFromPfds(int fromFd);
 	bool			checkPassword(const std::string &password) const;
 	Channel			*getChannelByName(const std::string &name);
+	bool			removeChannelFromServer(Channel &channel);
 
 	void			sendError(enum Replies err_code, const Command &cmd, int requesting_client_fd, std::string extra_prefix = "");
-	/* // NICK command
-	void			setNickname(const std::string &nickname, int fd);
-	// JOIN command
-	void			joinChannel(const std::string &channel, int fd, const std::string &password = "");
-	// PRIVMSG command
-	void			sendToChannel(const std::string &channel, const std::string &message ,int fd);
-	void			sendToUser(const std::string &user, const std::string &message, int fd);
-	// KICK command
-	void			kickUser(const std::string &channel, const std::string &user, int fd, const std::string &comment = "");
-	// INVITE command
-	void			inviteUser(const std::string &channel, const std::string &user, int fd);
-	// TOPIC command
-	void			setTopic(const std::string &channel, int fd, const std::string topic = "");
-	// MODE command
-	void			setMode(const std::string &channel, const std::string mode, int fd, const std::string &parameters = "");
-	// PART command
-	void			leaveChannel(const std::string &channel, int fd, const std::string &reason = "");
-	// QUIT command
-	void			quitServer(int fd, const std::string &comment = ""); */
+
 	void			setNickname(const Command &cmd, int fromFd);
 	void			joinChannel(const Command &cmd, int fromFd);
 	void			sendMessage(const Command &cmd, int fromFd);
@@ -72,7 +105,9 @@ private:
 
 	bool			userExists(const std::string &value);
 	int				getUserFd(const std::string &value);
-	bool			channelExists(const std::string &channel_str, Channel **channel = 0);
+	bool			channelExists(const std::string &channel_str);
+	bool			removeUserFromChannel(const std::string &user, Channel &channel);
+
 	const std::string	getNameList(const Channel *channel) const;
 	const std::string	getInvitedChannels(const std::string &user) const;
 };

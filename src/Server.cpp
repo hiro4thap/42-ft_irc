@@ -125,47 +125,51 @@ bool	Server::checkPassword(const std::string &password) const
 
 Channel	*Server::getChannelByName(const std::string &name)
 {
-	for (std::size_t i = 0; i < _channels.size(); i++)
+	for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); it++)
 	{
-		if(_channels[i].getName() == name)
-			return &_channels[i];
+		if(it->getName() == name)
+			return &(*it);
 	}
 	return NULL;
 }
 
-bool	Server::channelExists(const std::string &channel_str, Channel **channel)
+bool	Server::removeChannelFromServer(Channel &channel)
+{
+	for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); it++)
+	{
+		if(it->getName() == channel.getName())
+		{
+			_channels.erase(it);
+			return true;
+		}
+	}
+	return false;
+}
+
+bool	Server::channelExists(const std::string &channel_str)
 {
 	for (std::vector<Channel>::iterator it = this->_channels.begin(); it != this->_channels.end(); it++)
 	{
 		if (it->getName() == channel_str)
-		{
-			if (channel != 0)
-			{
-				*channel = &(*it);
-			}
 			return true;
-		}
 	}
-	*channel = NULL;
 	return false;
 }
 
-// static std::vector<std::string> tokenise(std::string input)
-// {
-// 	std::vector<std::string> tokens;
+bool	Server::removeUserFromChannel(const std::string &user, Channel &channel)
+{
+	bool removedUser = false;
+	if (Channel::containsUser(channel.getUsers(), user))
+	{
+		removedUser = true;
+		channel.removeUser(user);
+	}
+	if (Channel::containsUser(channel.getOperators(), user))
+		channel.removeOperator(user);
+	return removedUser;
+}
 
-// 	std::stringstream ss(input);
 
-// 	std::string token;
-// 	while (getline(ss, token, ' '))
-// 	{
-// 		if (!token.empty())
-// 		{
-// 			tokens.push_back(token);
-// 		}
-// 	}
-// 	return tokens;
-// }
 
 void	Server::sendClient(std::string message, int toFd)
 {
@@ -283,63 +287,10 @@ void	Server::setNickname(const Command &cmd, int fromFd)
 	}
 }
 
-
-
-
-enum Replies
-{
-	RPL_NONE = 300,
-	RPL_NOTOPIC = 331,
-	RPL_TOPIC = 332,
-	RPL_NAMERPLY = 353,
-	RPL_ENDOFNAMES = 366,
-
-	ERR_NOSUCHNICK = 401,
-	ERR_NOSUCHCHANNEL = 403,
-	ERR_CANNOTSENDTOCHAN = 404,
-	ERR_TOOMANYCHANNELS = 405,
-	// ERR_TOOMANYTARGETS = 407,
-	// ERR_NOORIGIN = 409,
-	ERR_NORECIPIENT = 411,
-	ERR_NOTEXTTOSEND = 412,
-	// ERR_NOTOPLEVEL = 413,
-	// ERR_WILDTOPLEVEL = 414,
-	ERR_INPUTTOOLONG = 417,
-	ERR_UNKNOWNCOMMAND = 421,
-	ERR_NONICKNAMEGIVEN = 431,
-	ERR_ERRONEUSNICKNAME = 432,
-	ERR_NICKNAMEINUSE = 433,
-	// ERR_NICKCOLLISION = 436,
-	ERR_USERNOTINCHANNEL = 441,
-	ERR_NOTONCHANNEL = 442,
-	ERR_USERONCHANNEL = 443,
-	// ERR_USERDISABLED = 446,
-	ERR_NOTREGISTERED = 451,
-	ERR_NEEDMOREPARAMS = 461,
-	ERR_ALREADYREGISTRED = 462,
-	// ERR_NOPERMFORHOST = 463,
-	ERR_PASSWDMISMATCH = 464,
-	// ERR_YOUREBANNEDCREEP = 465,
-	// ERR_KEYSET = 467,
-	ERR_CHANNELISFULL = 471,
-	ERR_UNKNOWNMODE = 472,
-	ERR_INVITEONLYCHAN = 473,
-	// ERR_BANNEDFROMCHAN = 474,
-	ERR_BADCHANNELKEY = 475,
-	ERR_BADCHANMASK = 476,
-	ERR_NOPRIVILEGES = 481,
-	ERR_CHANOPRIVSNEEDED = 482,
-
-	ERR_UMODEUNKNOWNFLAG = 501,
-	// ERR_USERSDONTMATCH = 502,
-
-	ERR_INVALIDKEY = 525
-};
-
-
 // Need a way of handling which channel/user throws an error when multiple are possible.
 void Server::sendError(enum Replies err_code, const Command &cmd, int requesting_client_fd, std::string extra_prefix)
 {
+	(void) cmd;
 	std::map<enum Replies, std::string> err_msg;
 	err_msg[ERR_NOSUCHNICK]			= "No such nickname";
 	err_msg[ERR_NOSUCHCHANNEL]		= "No such channel";
@@ -373,109 +324,45 @@ void Server::sendError(enum Replies err_code, const Command &cmd, int requesting
 	
 	if (extra_prefix.size() > 0)
 		message += " " + extra_prefix;
-	// switch (err_code)
-	// {
-	// case ERR_NOSUCHNICK:
-	// case ERR_ERRONEUSNICKNAME:
-	// case ERR_NICKNAMEINUSE:
-	// 	message += " " + cmd.users[0];
-	// 	break;
-	
-	// case ERR_NOSUCHCHANNEL:
-	// case ERR_CANNOTSENDTOCHAN:
-	// case ERR_TOOMANYCHANNELS:
-	// case ERR_NOTONCHANNEL:
-	// case ERR_CHANNELISFULL:
-	// case ERR_INVITEONLYCHAN:
-	// case ERR_BADCHANNELKEY:
-	// case ERR_CHANOPRIVSNEEDED:
-	// case ERR_INVALIDKEY:
-	// 	message += " " + cmd.channels[0];
-	// 	break;
-
-	// case ERR_UNKNOWNCOMMAND:
-	// case ERR_NEEDMOREPARAMS:
-	// 	message += " " + cmd.command;
-	// 	break;
-
-	// case ERR_USERNOTINCHANNEL:
-	// case ERR_USERONCHANNEL:
-	// 	message += " " + cmd.users[0] + " " + cmd.channels[0];
-	// 	break;
-
-	// case ERR_UNKNOWNMODE:
-	// 	message += " " + cmd.mode_operations[0];
-	// 	break;
-	
-	// default:
-	// 	break;
-	// }
-
 	message += " :" + err_msg[err_code];
-
 	sendClient(message, requesting_client_fd);
 }
 
+
+// 474 ERR_BANNEDFROMCHAN not supported
+// 476 ERR_BADCHANMASK not supported
+// 405 ERR_TOOMANYCHANNELS not supported
 void	Server::joinChannel(const Command &cmd, int fromFd)
 {
-	Channel *ch;
-	// 461 ERR_NEEDMOREPARAMS
 	if (cmd.channels.size() == 0)
-	{
 		return sendError(ERR_NEEDMOREPARAMS, cmd, fromFd);
-	}
 
 	std::string channel_name = "";
-	if (cmd.channels.size() > 0)
-		channel_name = cmd.channels[0];
+	for (std::size_t i = 0; i < cmd.channels.size(); i++)
+	{
+		channel_name = cmd.channels[i];
 
-	// 476 ERR_BADCHANMASK not supported
-	// 403 ERR_NOSUCHCHANNEL
-	if (Channel::validChannelName(channel_name) == false)
-	{
-		return sendError(ERR_NOSUCHCHANNEL, cmd, fromFd, channel_name);
-	}
-	// 405 ERR_TOOMANYCHANNELS not supported
-	// 475 ERR_BADCHANNELKEY
-	if (channelExists(channel_name, &ch) && ch->getHasPassword() && ch->checkPassword(cmd.keys[0]) == false)
-	{
-		return sendError(ERR_BADCHANNELKEY, cmd, fromFd, channel_name);
-	}
-	// 474 ERR_BANNEDFROMCHAN not supported
-	// 471 ERR_CHANNELISFULL
-	if (ch && ch->getHasLimit() && ch->getUsers().size() >= ch->getLimit())
-	{
-		return sendError(ERR_CHANNELISFULL, cmd, fromFd, channel_name);
-	}
-	// 473 ERR_INVITEONLYCHAN
-	if (ch && ch->getIsInviteOnly() && Channel::containsUser(ch->getInvitedUsers(), _users[fromFd]) == false)
-	{
-		return sendError(ERR_INVITEONLYCHAN, cmd, fromFd, channel_name);
-	}
-	// 332 RPL_TOPIC
-	// 333 RPL_TOPICWHOTIME
-	// 353 RPL_NAMREPLY
-	// 366 RPL_ENDOFNAMES
-	if (!ch) //create new one
-	{
-		Channel new_channel(channel_name);
-		new_channel.addUser(_users[fromFd]);
-		new_channel.addOperator(_users[fromFd]);
-		_channels.push_back(new_channel);
-		sendChannel(":" + _users[fromFd] + " JOIN " + channel_name, channel_name, fromFd);
-		sendClient(":" + _users[fromFd] + " JOIN " + channel_name, fromFd);
-		if (new_channel.getTopicSetAt().empty())
-			sendClient(":server 331 " + _users[fromFd] + " " + channel_name + " :" + "No topic is set", fromFd);
-		else
+		if (Channel::validChannelName(channel_name) == false)
+			return sendError(ERR_NOSUCHCHANNEL, cmd, fromFd, channel_name);
+
+		if (!channelExists(channel_name))
 		{
-			sendClient(":server 332 " + _users[fromFd] + " " + channel_name + " :" + new_channel.getTopic(), fromFd);
-			sendClient(":server 333 " + _users[fromFd] + " " + channel_name + " " + new_channel.getTopicSetBy() + " " + new_channel.getTopicSetAt(), fromFd);
+			Channel new_channel(channel_name);
+			new_channel.addOperator(_users[fromFd]);
+			_channels.push_back(new_channel);
 		}
-		sendClient(":server 353 " + _users[fromFd] + " = " + channel_name + " :@" + _users[fromFd], fromFd);
-		sendClient(":server 366 " + _users[fromFd] + " " + channel_name + " :End of NAMES list", fromFd);
-	}
-	else
-	{
+		Channel *ch = getChannelByName(channel_name);
+
+		if (ch->getHasPassword() && ch->checkPassword(cmd.keys[i]) == false)
+			return sendError(ERR_BADCHANNELKEY, cmd, fromFd, channel_name);
+		if (ch->getHasLimit() && ch->getUsers().size() >= ch->getLimit())
+			return sendError(ERR_CHANNELISFULL, cmd, fromFd, channel_name);
+		if (ch->getIsInviteOnly() && Channel::containsUser(ch->getInvitedUsers(), _users[fromFd]) == false)
+			return sendError(ERR_INVITEONLYCHAN, cmd, fromFd, channel_name);
+		// 332 RPL_TOPIC
+		// 333 RPL_TOPICWHOTIME
+		// 353 RPL_NAMREPLY
+		// 366 RPL_ENDOFNAMES
 		if (Channel::containsUser(ch->getInvitedUsers(), _users[fromFd]))
 			ch->removeInvitedUser(_users[fromFd]);
 		ch->addUser(_users[fromFd]);
@@ -495,25 +382,20 @@ void	Server::joinChannel(const Command &cmd, int fromFd)
 
 void	Server::processMode(const Command &cmd, int fromFd)
 {
-	Channel *ch;
-	std::string channel_name = "";
-	if (cmd.channels.size() > 0)
-		channel_name = cmd.channels[0];
+	if (cmd.channels.empty())
+		return sendError(ERR_NEEDMOREPARAMS, cmd, fromFd);
+	
+	std::string channel_name = cmd.channels[0];
 
-	// 403 ERR_NOSUCHCHANNEL
-	if (channelExists(channel_name, &ch) == false)
-	{
+	if (channelExists(channel_name) == false)
 		return sendError(ERR_NOSUCHCHANNEL, cmd, fromFd, channel_name);
-	}
-
-	// 442 ERR_NOTONCHANNEL
-	if (ch && Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
-	{
+	
+	Channel *ch = getChannelByName(channel_name);
+	if (Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
 		return sendError(ERR_NOTONCHANNEL, cmd, fromFd, channel_name);
-	}
 
 	// 324 RPL_CHANNELMODEIS
-	if (ch && cmd.mode_operations.size() == 0)
+	if (cmd.mode_operations.size() == 0)
 	{
 		std::string message = ":server 324 " + _users[fromFd] + " " + channel_name;
 		std::string	limit_arg = "";
@@ -539,11 +421,8 @@ void	Server::processMode(const Command &cmd, int fromFd)
 		return ;
 	}
 
-	// 482 ERR_CHANOPRIVSNEEDED
 	if (ch && Channel::containsUser(ch->getOperators(), _users[fromFd]) == false)
-	{
 		return sendError(ERR_CHANOPRIVSNEEDED, cmd, fromFd, channel_name);
-	}
 
 	// SET MODES
 	else
@@ -604,42 +483,24 @@ void	Server::processMode(const Command &cmd, int fromFd)
 				ch->setHasLimit(false);
 				processed_operations += *it;
 			}
-			else if (*it == "+o")
+			else if (*it == "+o" || *it == "-o")
 			{
-				// 401 ERR_NOSUCHNICK
 				if (!userExists(cmd.mode_parameters[index]))
 				{
-					std::string	message = ":serever 401 " + _users[fromFd] + " " + cmd.mode_parameters[index] + " :No such nick/channel";
-					sendClient(message, fromFd);
+					sendError(ERR_NOSUCHNICK, cmd, fromFd, cmd.mode_parameters[index]);
 					index++;
 					continue ;
 				}
-				if (!Channel::containsUser(ch->getUsers(), cmd.mode_parameters[index]) || Channel::containsUser(ch->getOperators(), cmd.mode_parameters[index]))
+				if (!Channel::containsUser(ch->getUsers(), cmd.mode_parameters[index])
+					|| Channel::containsUser(ch->getOperators(), cmd.mode_parameters[index]))
 				{
 					index++;
 					continue ;
 				}
-				ch->addOperator(cmd.mode_parameters[index]);
-				processed_operations += *it;
-				processed_parameters += cmd.mode_parameters[index];
-				index++;
-			}
-			else if (*it == "-o")
-			{
-				// 401 ERR_NOSUCHNICK
-				if (!userExists(cmd.mode_parameters[index]))
-				{
-					std::string	message = ":serever 401 " + _users[fromFd] + " " + cmd.mode_parameters[index] + " :No such nick/channel";
-					sendClient(message, fromFd);
-					index++;
-					continue ;
-				}
-				if (!Channel::containsUser(ch->getUsers(), cmd.mode_parameters[index]) || !Channel::containsUser(ch->getOperators(), cmd.mode_parameters[index]))
-				{
-					index++;
-					continue ;
-				}
-				ch->removeOperator(cmd.mode_parameters[index]);
+				if (*it == "+o")
+					ch->addOperator(cmd.mode_parameters[index]);
+				else
+					ch->removeOperator(cmd.mode_parameters[index]);
 				processed_operations += *it;
 				processed_parameters += cmd.mode_parameters[index];
 				index++;
@@ -656,8 +517,7 @@ void	Server::processMode(const Command &cmd, int fromFd)
 			}
 			else
 			{
-				std::string	message = ":server 472 " + _users[fromFd] + " " + (*it)[1] + " :is unkonw mode char to me"; 
-				sendClient(message, fromFd);
+				sendError(ERR_UNKNOWNMODE, cmd, fromFd, (*it).substr(1,1));
 			}
 		}
 		std::string	message = ":" + _users[fromFd] + " MODE " + channel_name + " " + processed_operations + " " + processed_parameters;
@@ -687,77 +547,72 @@ void	Server::sendAllClients(std::string response, int fromFd)
 	}
 }
 
+// PRIVMSG command
 void	Server::sendMessage(const Command &cmd, int fromFd)
 {
-	if (cmd.users.size() > 0)
-		sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.message, getUserFd(cmd.users[0]));
-	else
-		sendChannel(":" + _users[fromFd] + " PRIVMSG " + cmd.message, cmd.channels[0], fromFd);
-}
+	if (cmd.users.empty() && cmd.channels.empty())
+		return sendError(ERR_NORECIPIENT, cmd, fromFd);
+	if (cmd.message_set == false)
+		return sendError(ERR_NOTEXTTOSEND, cmd, fromFd);
 
-/* void	Server::sendToChannel(const std::string &channel, const std::string &message ,int fd)
-{
-	sendChannel(":" + _users[fd] + " PRIVMSG " + message, channel, fd);
+	for (std::size_t i = 0; i < cmd.channels.size(); i++)
+	{
+		if (channelExists(cmd.channels[i]))
+			sendChannel(":" + _users[fromFd] + " PRIVMSG " + cmd.message, cmd.channels[0], fromFd);
+		else
+			sendError(ERR_NOSUCHNICK, cmd, fromFd, cmd.channels[i]); // Docs suggest this, but ERR_NOSUCHCHANNEL seems more appropriate
+	}
+	for (std::size_t i = 0; i < cmd.users.size(); i++)
+	{
+		if (userExists(cmd.users[i]))
+			sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.message, getUserFd(cmd.users[0]));
+		else
+			sendError(ERR_NOSUCHNICK, cmd, fromFd, cmd.users[i]);
+	}
 }
-
-void	Server::sendToUser(const std::string &user, const std::string &message, int fd)
-{
-	sendClient(":" + _users[fd] + " PRIVMSG " + message, getUserFd(user));
-} */
 
 // KICK command
 void	Server::kickUser(const Command &cmd, int fromFd)
 {
-	Channel *ch;
-	std::string channel_name = "";
-	if (cmd.channels.size() > 0)
-		channel_name = cmd.channels[0];
-
-	// 476 BADCHANMASK
-	if (Channel::validChannelName(channel_name) == false)
-	{
-		return sendError(ERR_BADCHANMASK, cmd, fromFd, channel_name);
-	}
-
-	// 403 ERR_NOSUCHCHANNEL
-	else if (channelExists(channel_name, &ch) == false)
-	{
-		return sendError(ERR_NOSUCHCHANNEL, cmd, fromFd, channel_name);
-	}
-
-	// 442 ERR_NOTONCHANNEL
-	else if (Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
-	{
-		return sendError(ERR_NOTONCHANNEL, cmd, fromFd, channel_name);
-	}
-
-	// 482 ERR_CHANOPPRIVSNEED
-	else if (Channel::containsUser(ch->getOperators(), _users[fromFd]) == false)
-	{
-		return sendError(ERR_CHANOPRIVSNEEDED, cmd, fromFd, channel_name);
-	}
-
-	// 462 ERR_NEEDMOREPARAMS
 	
-	// 
-	else
+	if (cmd.channels.size() == 0 || cmd.users.size() == 0)
+		return sendError(ERR_NEEDMOREPARAMS, cmd, fromFd);
+
+	std::string channel_name = cmd.channels[0];
+	if (Channel::validChannelName(channel_name) == false)
+		return sendError(ERR_BADCHANMASK, cmd, fromFd, channel_name);
+	if (!channelExists(channel_name))
+		return sendError(ERR_NOSUCHCHANNEL, cmd, fromFd, channel_name);
+	Channel *ch = getChannelByName(channel_name);
+
+	if (Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
+		return sendError(ERR_NOTONCHANNEL, cmd, fromFd, channel_name);
+	if (Channel::containsUser(ch->getOperators(), _users[fromFd]) == false)
+		return sendError(ERR_CHANOPRIVSNEEDED, cmd, fromFd, channel_name);
+
+	for (std::size_t i = 0; i < cmd.users.size(); i++)
 	{
-		std::string message = ":" + _users[fromFd] + " KICK " + channel_name + " " + cmd.users[0];
+		if (Channel::containsUser(ch->getUsers(), cmd.users[i]) == false)
+		{
+			sendError(ERR_USERNOTINCHANNEL, cmd, fromFd, cmd.users[i] + " " + channel_name);
+			continue ;
+		}
+		std::string message = ":" + _users[fromFd] + " KICK " + channel_name + " " + cmd.users[i];
 		if (cmd.message_set)
-			message += " " + cmd.message;
+			message += " :" + cmd.message;
+		else
+			message += " :Kicked from " + channel_name + " by " + _users[fromFd];
 		sendClient(message, fromFd);
 		sendChannel(message, channel_name, fromFd);
-		ch->removeUser(cmd.users[0]);
+		removeUserFromChannel(cmd.users[i], *ch);
 	}
+	if (ch->getUsers().empty())
+		removeChannelFromServer(*ch);
 }
 
 // INVITE command
 void	Server::inviteUser(const Command &cmd, int fromFd)
 {
-	Channel	*ch;
-	std::string channel_name = "";
-	if (cmd.channels.size() > 0)
-		channel_name = cmd.channels[0];
 	// 336 RPL_INVITELIST
 	// 337 RPL_ENDOFINVITELIST
 	if (cmd.channels.empty() && cmd.users.empty())
@@ -770,71 +625,62 @@ void	Server::inviteUser(const Command &cmd, int fromFd)
 		}
 		std::string	message = ":server 337 " + _users[fromFd] + " :End of /INVITE list";
 		sendClient(message, fromFd);
+		return ;
 	}
-	// 403 ERR_NOSUCHCHANNEL
-	else if (channelExists(channel_name, &ch) == false)
-	{
+
+	if (cmd.channels.empty())
+		return sendError(ERR_NEEDMOREPARAMS, cmd, fromFd);
+
+	std::string channel_name = cmd.channels[0];
+
+	if (!channelExists(channel_name))
 		return sendError(ERR_NOSUCHCHANNEL, cmd, fromFd, channel_name);
-	}
-	// 461 ERR_NEEDMOREPARAMS
-	// 442 ERR_NOTONCHANNEL
-	else if (ch && Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
-	{
+	Channel *ch = getChannelByName(channel_name);
+
+	if (Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
 		return sendError(ERR_NOTONCHANNEL, cmd, fromFd, channel_name);
-	}
-	// 482 ERR_CHANOPRIVSNEEDED
-	else if (ch && ch->getIsInviteOnly() && Channel::containsUser(ch->getOperators(), _users[fromFd]) == false)
-	{
+	if (ch->getIsInviteOnly() && Channel::containsUser(ch->getOperators(), _users[fromFd]) == false)
 		return sendError(ERR_CHANOPRIVSNEEDED, cmd, fromFd, channel_name);
-	}
+	
 	// 341 RPL_INVITING
-	else if (ch && Channel::containsUser(ch->getInvitedUsers(), cmd.users[0]))
+	if (ch && Channel::containsUser(ch->getInvitedUsers(), cmd.users[0]))
 	{
 		std::string message = ":server 341 " + _users[fromFd] + " " + cmd.users[0] + " " + channel_name; //TODO: needs to store who invited a user
 		sendClient(message, fromFd);
+		return ;
 	}
+
 	// 443 ERR_USERONCHAN
-	else if (ch && Channel::containsUser(ch->getUsers(), cmd.users[0]))
-	{
+	if (ch && Channel::containsUser(ch->getUsers(), cmd.users[0]))
 		return sendError(ERR_USERONCHANNEL, cmd, fromFd, channel_name);
-	}
+
 	// RESPONSE
-	else
-	{
-		ch->addInvitedUser(cmd.users[0]);
-		std::string	message = ":" + _users[fromFd] + " INVITE " + cmd.users[0] + " :" + channel_name;
-		sendClient(message, getUserFd(cmd.users[0]));
-	}
+	ch->addInvitedUser(cmd.users[0]);
+	std::string	message = ":" + _users[fromFd] + " INVITE " + cmd.users[0] + " :" + channel_name;
+	sendClient(message, getUserFd(cmd.users[0]));
+
 }
 
 // TOPIC command
 void	Server::processTopic(const Command &cmd, int fromFd)
 {
-	Channel *ch;
-	std::string channel_name = "";
-	if (cmd.channels.size() > 0)
-		channel_name = cmd.channels[0];
-	// 461 ERR_NEEDMOREPARAMS
-	// if (topic.empty())
-	// {
-	// 	std::string message = "JOIN :Not enough parameters";
-	// 	sendClient(message, fd);
-	// }
-	// 403 ERR_NOSUCHCHANNEL
-	if (channelExists(channel_name, &ch) == false)
-	{
+	if (cmd.channels.empty())
+		return sendError(ERR_NEEDMOREPARAMS, cmd, fromFd);
+	
+	std::string channel_name = cmd.channels[0];
+
+	if (channelExists(channel_name) == false)
 		return sendError(ERR_NOSUCHCHANNEL, cmd, fromFd, channel_name);
-	}
-	// 442 ERR_NOTONCHANNEL
-	else if (ch && Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
-	{
+	
+	Channel *ch = getChannelByName(channel_name);
+
+	if (ch && Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
 		return sendError(ERR_NOTONCHANNEL, cmd, fromFd, channel_name);
-	}
 
 	// 331 RPL_NOTOPIC
 	// 332 RPL_TOPIC
 	// 333 RPL_TOPICWHOTIME
-	else if (cmd.message_set == false)
+	if (cmd.message_set == false)
 	{
 		if (ch->getTopicSetAt().empty())
 			sendClient(":server 331 " + _users[fromFd] + " " + channel_name + " :" + "No topic is set", fromFd);
@@ -843,45 +689,43 @@ void	Server::processTopic(const Command &cmd, int fromFd)
 			sendClient(":server 332 " + _users[fromFd] + " " + channel_name + " :" + ch->getTopic(), fromFd);
 			sendClient(":server 333 " + _users[fromFd] + " " + channel_name + " " + ch->getTopicSetBy() + " " + ch->getTopicSetAt(), fromFd);
 		}
+		return ;
 	}
-	// 482 ERR_CHANOPRIVSNEEDED
-	else if (ch && ch->getHasRestrictTopic() && Channel::containsUser(ch->getOperators(), _users[fromFd]) == false)
-	{
+
+	if (ch->getHasRestrictTopic() && Channel::containsUser(ch->getOperators(), _users[fromFd]) == false)
 		return sendError(ERR_CHANOPRIVSNEEDED, cmd, fromFd, channel_name);
-	}
-	else
-	{
-		ch->setTopic(cmd.message, _users[fromFd]);
-		sendClient(":" + _users[fromFd] + " TOPIC " + channel_name + " " + cmd.message, fromFd);
-		sendChannel(":" + _users[fromFd] + " TOPIC " + channel_name + " " + cmd.message, channel_name, fromFd);
-	}
+	
+	ch->setTopic(cmd.message, _users[fromFd]);
+	sendClient(":" + _users[fromFd] + " TOPIC " + channel_name + " " + cmd.message, fromFd);
+	sendChannel(":" + _users[fromFd] + " TOPIC " + channel_name + " " + cmd.message, channel_name, fromFd);
+	
 }
 
 // PART command
-void	Server::leaveChannel(const Command &cmd, int fromFd) //TODO: remove channel if empty
+void	Server::leaveChannel(const Command &cmd, int fromFd)
 {
-	Channel	*ch;
-	std::string channel_name = "";
-	if (cmd.channels.size() > 0)
-		channel_name = cmd.channels[0];
-	// 461 ERR_NEEDMOREPARAMS
-	// 403 ERR_NOSUCHCHANNEL
-	if (channelExists(channel_name, &ch) == false)
+	if (cmd.channels.empty())
+		return sendError(ERR_NEEDMOREPARAMS, cmd, fromFd);
+
+	for (std::size_t i = 0; i < cmd.channels.size(); i++)
 	{
-		return sendError(ERR_NOSUCHCHANNEL, cmd, fromFd, channel_name);
-	}
-	// 442 ERR_NOTONCHANNEL
-	else if (ch && Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
-	{
-		return sendError(ERR_NOTONCHANNEL, cmd, fromFd, channel_name);
-	}
-	// RESPONSE
-	else
-	{
-		ch->removeUser(_users[fromFd]);
+		std::string channel_name = cmd.channels[i];
+
+		if (channelExists(channel_name) == false)
+			return sendError(ERR_NOSUCHCHANNEL, cmd, fromFd, channel_name);
+
+		Channel	*ch = getChannelByName(channel_name);
+
+		if (Channel::containsUser(ch->getUsers(), _users[fromFd]) == false)
+			return sendError(ERR_NOTONCHANNEL, cmd, fromFd, channel_name);
+
+		// RESPONSE
+		removeUserFromChannel(_users[fromFd], *ch);
 		std::string message = ":" + _users[fromFd] + " PART " + channel_name + " " + cmd.message;
 		sendClient(message, fromFd);
 		sendChannel(message, channel_name, fromFd);
+		if (ch->getUsers().empty())
+			removeChannelFromServer(*ch);
 	}
 }
 
@@ -908,10 +752,10 @@ void	Server::quitServer(const Command &cmd, int fromFd)
 
 void	Server::sendChannel(std::string response, const std::string &channel, int fromFd)
 {
-	Channel *cnl = getChannelByName(channel);
-	if (!cnl)
+	Channel *ch = getChannelByName(channel);
+	if (!ch)
 		return ;
-	std::vector<std::string> users = cnl->getUsers();
+	std::vector<std::string> users = ch->getUsers();
 	for (std::size_t i = 0; i < users.size(); i++)
 	{
 		int fd = getUserFd(users[i]);
