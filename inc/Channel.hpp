@@ -42,6 +42,8 @@ public:
 
 	static bool			containsUser(const std::vector<std::string> &user_list, const std::string &user);
 	static bool			validChannelName(const std::string &name);
+	bool				operator==(const Channel &rhs) const;
+	bool				operator!=(const Channel &rhs) const;
 
 private:
 	std::string	_name;

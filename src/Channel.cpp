@@ -206,3 +206,13 @@ bool	Channel::validChannelName(const std::string &name)
 	}
 	return true;
 }
+
+bool	Channel::operator==(const Channel &rhs) const
+{
+	return (_name == rhs.getName());
+}
+
+bool	Channel::operator!=(const Channel &rhs) const
+{
+	return (_name != rhs.getName());
+}

@@ -9,8 +9,8 @@ Server::~Server()
 	delete[] _pfds;
 }
 
-Server::Server(unsigned int port, std::string passwrod):
-	_port(port), _password(passwrod), _capacity(5), _size(0)
+Server::Server(unsigned int port, std::string password):
+	_port(port), _password(password), _capacity(5), _size(0)
 {
 	_pfds = new struct pollfd[_capacity];
 }
@@ -68,7 +68,8 @@ void	Server::launch(int serverSocket)
 				if (clientSocket == -1)
 				{
 					perror("accept");
-					break ;
+					delFromPfds(_pfds[i].fd);
+					continue ;
 				}
 				addToPfds(clientSocket);
 			}
@@ -79,7 +80,8 @@ void	Server::launch(int serverSocket)
 				if (recv(_pfds[i].fd, buffer, sizeof(buffer), 0) == -1)
 				{
 					perror("recv");
-					break ;
+					delFromPfds(_pfds[i].fd);
+					continue ;
 				}
 				std::cout << "Message from client " << i << " :" << buffer << std::endl;
 				processCommand(buffer, _pfds[i].fd);
@@ -108,19 +110,25 @@ void	Server::addToPfds(int fd)
 
 void	Server::delFromPfds(int fromFd)
 {
+	for (std::size_t i = 0; i < _channels.size(); i++)
+	{
+		if (Channel::containsUser(_channels[i].getUsers(), _users[fromFd]))
+			_channels[i].removeUser(_users[fromFd]);		
+		if (Channel::containsUser(_channels[i].getOperators(), _users[fromFd]))
+			_channels[i].removeOperator(_users[fromFd]);		
+		if (Channel::containsUser(_channels[i].getInvitedUsers(), _users[fromFd]))
+			_channels[i].removeInvitedUser(_users[fromFd]);		
+		if (_channels[i].getUsers().size() == 0)
+			removeChannelFromServer(_channels[i].getName());
+	}
+	if (_users.find(fromFd) != _users.end())
+		_users.erase(fromFd);
 	for (std::size_t i = 0; i < _size; i++)
 	{
 		if (_pfds[i].fd != fromFd)
 			continue ;
 		close(_pfds[i].fd);
-		_pfds[i] = _pfds[_size - 1];
-		_size--;
 	}	
-}
-
-bool	Server::checkPassword(const std::string &password) const
-{
-	return (password == _password);
 }
 
 Channel	*Server::getChannelByName(const std::string &name)
@@ -133,18 +141,34 @@ Channel	*Server::getChannelByName(const std::string &name)
 	return NULL;
 }
 
-bool	Server::removeChannelFromServer(Channel &channel)
+bool	Server::hasPassed(int fd)
 {
-	for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); it++)
-	{
-		if(it->getName() == channel.getName())
-		{
-			_channels.erase(it);
-			return true;
-		}
-	}
-	return false;
+	std::vector<int>::iterator	it = std::find(_passed_fds.begin(), _passed_fds.end(), fd);
+	return (it != _passed_fds.end());
 }
+
+// bool	Server::removeChannelFromServer(Channel &channel)
+// {
+// 	for (std::vector<Channel>::iterator it = _channels.begin(); it != _channels.end(); it++)
+// 	{
+// 		if(it->getName() == channel.getName())
+// 		{
+// 			_channels.erase(it);
+// 			return true;
+// 		}
+// 	}
+// 	return false;
+// }
+
+bool	Server::removeChannelFromServer(const std::string &channel_name)
+{
+	Channel *ch = getChannelByName(channel_name);
+	if (!ch)
+		return false;
+	_channels.erase(std::remove(_channels.begin(), _channels.end(), *ch), _channels.end());
+	return true;
+}
+
 
 bool	Server::channelExists(const std::string &channel_str)
 {
@@ -186,45 +210,61 @@ void	Server::processCommand(std::string command, int fromFd)
 {
 	// if (command.size() >= 3 && command.substr(0,3) == "CAP")
 	// 	return ;
-	Command cmd;
-	cmd.command = "";
-	cmd.err_response = 0;
-	cmd.threw_error = false;
-	cmd.message_set = false;
-	cmd.message = "";
-
-	std::map<std::string, void(Server::*)(const Command&, int)> commands;
-	commands["JOIN"] = &Server::joinChannel;
-	commands["NICK"] = &Server::setNickname;
-	commands["PRIVMSG"] = &Server::sendMessage;
-	commands["KICK"] = &Server::kickUser;
-	commands["INVITE"] = &Server::inviteUser;
-	commands["TOPIC"] = &Server::processTopic;
-	commands["MODE"] = &Server::processMode;
-	commands["PART"] = &Server::leaveChannel;
-	commands["QUIT"] = &Server::quitServer;
 
 	Parser parser;
 
-	parser.message(command, cmd);
-
-	std::map<std::string, void(Server::*)(const Command&, int)>::iterator command_function = commands.find(cmd.command);
-	if (command_function != commands.end())
+	std::size_t pos_start = 0;
+	std::size_t pos_end = 0;
+	std::string	token;
+    while ((pos_end = command.find("\r\n", pos_start)) != std::string::npos)
 	{
-		(this->*(command_function->second))(cmd, fromFd);
-	}
+		std::map<std::string, void(Server::*)(const Command&, int)> commands;
+		if (_password.empty() || !hasPassed(fromFd))
+		{
+			commands["PASS"] = &Server::checkPassword;
+		}
+		else if (_users.find(fromFd) == _users.end())
+		{
+			commands["NICK"] = &Server::setNickname;
+			commands["PASS"] = &Server::checkPassword;
+		}
+		else
+		{
+			commands["JOIN"] = &Server::joinChannel;
+			commands["NICK"] = &Server::setNickname;
+			commands["PRIVMSG"] = &Server::sendMessage;
+			commands["KICK"] = &Server::kickUser;
+			commands["INVITE"] = &Server::inviteUser;
+			commands["TOPIC"] = &Server::processTopic;
+			commands["MODE"] = &Server::processMode;
+			commands["PART"] = &Server::leaveChannel;
+			commands["QUIT"] = &Server::quitServer;
+			commands["PASS"] = &Server::checkPassword;
+		}
 
-	// // QUIT command
-	// // void			quitServer(int fd, const std::string &comment = "");
-	// else if (tokens[0] == "QUIT")
-	// {
-	// 	if (tokens.size() > 1)
-	// 		quitServer(fromFd, tokens[1]);
-	// 	else
-	// 		quitServer(fromFd);
-	// 	delFromPfds(fromFd);
-	// }
+		Command cmd;
+		cmd.command = "";
+		cmd.err_response = 0;
+		cmd.threw_error = false;
+		cmd.message_set = false;
+		cmd.message = "";
 
+		pos_end += 2;
+        token = command.substr(pos_start, pos_end - pos_start);
+		pos_start = pos_end;
+		
+		parser.message(token, cmd);
+
+		std::map<std::string, void(Server::*)(const Command&, int)>::iterator command_function = commands.find(cmd.command);
+		if (command_function != commands.end())
+		{
+			(this->*(command_function->second))(cmd, fromFd);
+		}
+		else if (_users.find(fromFd) == _users.end() || _users[fromFd].empty()) //TODO: check if _users added
+		{
+			return sendError(ERR_NOTREGISTERED, cmd, fromFd);
+		}
+    }
 }
 
 bool Server::userExists(const std::string &value)
@@ -274,7 +314,7 @@ void	Server::setNickname(const Command &cmd, int fromFd)
 	}
 	// 436 ERR_NICKCOLLISION not implemented
 	// RESPONSE
-	else if (_users.find(fromFd) == _users.end())
+	else if (_users.find(fromFd) == _users.end() || _users[fromFd].empty()) //TODO: check if _users added
 	{
 		sendClient(":server 001 " + nickname, fromFd);
 		_users[fromFd] = nickname;
@@ -454,12 +494,12 @@ void	Server::processMode(const Command &cmd, int fromFd)
 			}
 			else if (*it == "-k")
 			{
-				if (cmd.mode_parameters.size() <= index || !checkPassword(cmd.mode_parameters[index]))
+				if (cmd.mode_parameters.size() <= index || ch->checkPassword(cmd.mode_parameters[index]) == false )
 				{
 					index++;
 					continue ;
 				}
-				ch->setHasPassword(true);
+				ch->setHasPassword(false);
 				ch->setPassword(cmd.mode_parameters[index]);
 				processed_operations += *it;
 				processed_parameters += cmd.mode_parameters[index];
@@ -607,7 +647,7 @@ void	Server::kickUser(const Command &cmd, int fromFd)
 		removeUserFromChannel(cmd.users[i], *ch);
 	}
 	if (ch->getUsers().empty())
-		removeChannelFromServer(*ch);
+		removeChannelFromServer(ch->getName());
 }
 
 // INVITE command
@@ -725,7 +765,7 @@ void	Server::leaveChannel(const Command &cmd, int fromFd)
 		sendClient(message, fromFd);
 		sendChannel(message, channel_name, fromFd);
 		if (ch->getUsers().empty())
-			removeChannelFromServer(*ch);
+			removeChannelFromServer(ch->getName());
 	}
 }
 
@@ -736,18 +776,29 @@ void	Server::quitServer(const Command &cmd, int fromFd)
 	sendClient(message, fromFd);
 	message = ":" + _users[fromFd] + " QUIT :Quit " + cmd.message;
 	sendAllClients(message, fromFd);
-	for (std::size_t i = 0; i < _channels.size(); i++)
-	{
-		if (Channel::containsUser(_channels[i].getUsers(), _users[fromFd]))
-			_channels[i].removeUser(_users[fromFd]);		
-		if (Channel::containsUser(_channels[i].getOperators(), _users[fromFd]))
-			_channels[i].removeOperator(_users[fromFd]);		
-		if (Channel::containsUser(_channels[i].getInvitedUsers(), _users[fromFd]))
-			_channels[i].removeInvitedUser(_users[fromFd]);		
-	}
-	if (_users.find(fromFd) != _users.end())
-		_users.erase(fromFd);
 	delFromPfds(fromFd);
+}
+
+void	Server::checkPassword(const Command &cmd, int fromFd)
+{
+	// 461 ERR_NEEDMOREPARAMS
+	// 462 ERR_ALREADYREGISTERED
+	if (!_users[fromFd].empty())
+	{
+		std::string	message = ":server 462 " + _users[fromFd] + " :You may not reregister";
+		sendClient(message, fromFd);
+	}
+	// 464 ERR_PASSWDMISMATCH
+	else if (!cmd.message_set || cmd.message != _password)
+	{
+		std::string	message = ":server 464 " + _users[fromFd] + " :Password incorrect";
+		sendClient(message, fromFd);
+	}
+	else
+	{
+		if (!hasPassed(fromFd))
+			_passed_fds.push_back(fromFd);
+	}
 }
 
 void	Server::sendChannel(std::string response, const std::string &channel, int fromFd)
@@ -796,3 +847,4 @@ const std::string	Server::getInvitedChannels(const std::string &user) const
 	}
 	return channels;
 }
+
