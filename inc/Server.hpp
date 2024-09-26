@@ -62,6 +62,13 @@ enum Replies
 	ERR_INVALIDKEY = 525
 };
 
+struct user_info
+{
+	std::string nickname;
+	std::string	username;
+	std::string	real_name;
+};
+
 class	Server
 {
 public:
@@ -72,14 +79,15 @@ public:
 	void	launch(int serverSocket);
 	
 private:
-	struct pollfd				*_pfds; //TODO: type is to be changed as vector<struct pollfd>
-	unsigned int				_port;
-	std::string					_password;
-	unsigned int				_capacity;
-	unsigned int				_size;
-	std::vector<Channel>		_channels;
-	std::map<int, std::string>	_users;
-	std::vector<int>			_passed_fds;
+	struct pollfd						*_pfds; //TODO: type is to be changed as vector<struct pollfd>
+	unsigned int						_port;
+	std::string							_password;
+	unsigned int						_capacity;
+	unsigned int						_size;
+	std::vector<Channel>				_channels;
+	std::map<int, std::string>			_users;
+	std::map<std::string, user_info>	_user_info;
+	std::vector<int>					_passed_fds;
 
 	void			addToPfds(int fd);
 	void			delFromPfds(int fromFd);
@@ -91,8 +99,10 @@ private:
 	bool			hasPassed(int fd);	
 
 	void			setNickname(const Command &cmd, int fromFd);
+	void			setUser(const Command &cmd, int fromFd);
 	void			joinChannel(const Command &cmd, int fromFd);
 	void			sendMessage(const Command &cmd, int fromFd);
+	void			sendNotice(const Command &cmd, int fromFd);
 	void			kickUser(const Command &cmd, int fromFd);
 	void			inviteUser(const Command &cmd, int fromFd);
 	void			processTopic(const Command &cmd, int fromFd);

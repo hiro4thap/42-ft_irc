@@ -64,7 +64,7 @@ void	Server::launch(int serverSocket)
 			if (_pfds[i].fd == serverSocket)
 			{
 				std::cout << "Client " << _size << " is accepted" << std::endl;
-				int clientSocket = accept(serverSocket, nullptr, nullptr);
+				int clientSocket = accept(serverSocket, NULL, NULL);
 				if (clientSocket == -1)
 				{
 					perror("accept");
@@ -226,6 +226,7 @@ void	Server::processCommand(std::string command, int fromFd)
 		else if (_users.find(fromFd) == _users.end())
 		{
 			commands["NICK"] = &Server::setNickname;
+			commands["USER"] = &Server::setUser;
 			commands["PASS"] = &Server::checkPassword;
 		}
 		else
@@ -233,6 +234,7 @@ void	Server::processCommand(std::string command, int fromFd)
 			commands["JOIN"] = &Server::joinChannel;
 			commands["NICK"] = &Server::setNickname;
 			commands["PRIVMSG"] = &Server::sendMessage;
+			commands["NOTICE"] = &Server::sendNotice;
 			commands["KICK"] = &Server::kickUser;
 			commands["INVITE"] = &Server::inviteUser;
 			commands["TOPIC"] = &Server::processTopic;
@@ -293,6 +295,7 @@ static bool checkValidName(const std::string &nickname)
 	return true;
 }
 
+// NICK command
 void	Server::setNickname(const Command &cmd, int fromFd)
 {
 	// 431 ERR_NONICKNAMEGIVEN
@@ -325,6 +328,22 @@ void	Server::setNickname(const Command &cmd, int fromFd)
 		sendAllClients(":" + _users[fromFd] + " NICK " + nickname, fromFd);
 		_users[fromFd] = nickname;
 	}
+}
+
+// USER command
+// Needs error handling, and proper integration into setup process.
+void	Server::setUser(const Command &cmd, int fromFd)
+{
+	user_info new_user;
+	if (cmd.users.empty())
+		return sendError(ERR_NEEDMOREPARAMS, cmd, fromFd);
+	if (_user_info.find(_users[fromFd]) == _user_info.end())
+		return sendError(ERR_ALREADYREGISTRED, cmd, fromFd);
+	new_user.nickname = _users[fromFd];
+	new_user.username = cmd.users[0];
+	new_user.real_name = cmd.message;
+	_user_info[new_user.nickname] = new_user;
+
 }
 
 // Need a way of handling which channel/user throws an error when multiple are possible.
@@ -448,7 +467,7 @@ void	Server::processMode(const Command &cmd, int fromFd)
 		if (ch->getHasLimit())
 		{
 			mode_list += "l";
-			limit_arg = " " + std::to_string(ch->getLimit());
+			limit_arg = " " + Log::str(ch->getLimit());
 		}
 		if (ch->getHasRestrictTopic())
 		{
@@ -470,7 +489,7 @@ void	Server::processMode(const Command &cmd, int fromFd)
 		std::size_t index = 0;
 		std::string	processed_operations;
 		std::string	processed_parameters;
-		for (std::vector<std::string>::const_iterator it = cmd.mode_operations.cbegin(); it < cmd.mode_operations.cend(); it++)
+		for (std::vector<std::string>::const_iterator it = cmd.mode_operations.begin(); it < cmd.mode_operations.end(); it++)
 		{
 			if (*it == "+i")
 			{
@@ -608,6 +627,30 @@ void	Server::sendMessage(const Command &cmd, int fromFd)
 			sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.message, getUserFd(cmd.users[0]));
 		else
 			sendError(ERR_NOSUCHNICK, cmd, fromFd, cmd.users[i]);
+	}
+}
+
+// NOTICE command
+void	Server::sendNotice(const Command &cmd, int fromFd)
+{
+	if (cmd.users.empty() && cmd.channels.empty())
+		return ; // sendError(ERR_NORECIPIENT, cmd, fromFd);
+	if (cmd.message_set == false)
+		return ; // sendError(ERR_NOTEXTTOSEND, cmd, fromFd);
+
+	for (std::size_t i = 0; i < cmd.channels.size(); i++)
+	{
+		if (channelExists(cmd.channels[i]))
+			sendChannel(":" + _users[fromFd] + " NOTICE " + cmd.message, cmd.channels[0], fromFd);
+		// else
+		// 	sendError(ERR_NOSUCHNICK, cmd, fromFd, cmd.channels[i]); // Docs suggest this, but ERR_NOSUCHCHANNEL seems more appropriate
+	}
+	for (std::size_t i = 0; i < cmd.users.size(); i++)
+	{
+		if (userExists(cmd.users[i]))
+			sendClient(":" + _users[fromFd] + " NOTICE " + cmd.message, getUserFd(cmd.users[0]));
+		// else
+		// 	sendError(ERR_NOSUCHNICK, cmd, fromFd, cmd.users[i]);
 	}
 }
 

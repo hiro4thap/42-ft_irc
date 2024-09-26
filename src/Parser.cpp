@@ -4,7 +4,9 @@ Parser::Parser()
 {
 	_supported_commands.insert("JOIN");		// JOIN <channel>{,<channel>} [<key>{,<key>}]
 	_supported_commands.insert("NICK");		// NICK <nickname>
+	_supported_commands.insert("USER");		// USER <username> 0 * <real name>
 	_supported_commands.insert("PRIVMSG");	// PRIVMSG <target>{,<target>} <text to be sent>
+	_supported_commands.insert("NOTICE");	// NOTICE <target>{,<target>} <text to be sent>
 	_supported_commands.insert("KICK");		// KICK <channel> <user>{,<user>} [<comment>]
 	_supported_commands.insert("INVITE");	// INVITE <nickname> <channel>
 	_supported_commands.insert("TOPIC");	// TOPIC <channel> [<topic>]
@@ -13,8 +15,6 @@ Parser::Parser()
 	_supported_commands.insert("QUIT");		// QUIT <reason>
 	_supported_commands.insert("PASS");		// PASS <password>
 }
-
-
 
 
 bool Parser::error(std::string::const_iterator &it)
@@ -48,8 +48,10 @@ bool Parser::validateCommand(ParsedCommand &cmd_in, Command &cmd_out)
 
 	std::map<std::string, bool(*)(ParsedCommand&, Command&)> commands;
 	commands["JOIN"] = &validateJoin;
+	commands["USER"] = &validateUser;
 	commands["NICK"] = &validateNick;
 	commands["PRIVMSG"] = &validatePrivmsg;
+	commands["NOTICE"] = &validateNotice;
 	commands["KICK"] = &validateKick;
 	commands["INVITE"] = &validateInvite;
 	commands["TOPIC"] = &validateTopic;
@@ -125,8 +127,74 @@ bool Parser::validateNick(ParsedCommand &cmd_in, Command &cmd_out)
 	return true;
 }
 
+// USER <username> 0 * <realname>
+bool Parser::validateUser(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	if (cmd_in.parameters.size() > 0)
+	{
+		std::string::const_iterator it = cmd_in.parameters[0].begin();
+		std::string::const_iterator end = cmd_in.parameters[0].end();
+		if (!username(it, end) || *it != '\0')
+			return false;
+		cmd_out.users.push_back(cmd_in.parameters[0]);
+	}
+	if (cmd_in.parameters.size() > 1 && cmd_in.parameters[1] != "0")
+		return false;
+	if (cmd_in.parameters.size() > 2 && cmd_in.parameters[2] != "*")
+		return false;
+	if (!(cmd_in.parameters.size() > 3) && cmd_in.trailing.empty())
+		return false;
+	else
+	{
+		cmd_out.message_set = true;
+		if (!cmd_in.trailing.empty())
+			cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
+		else
+			cmd_out.message = cmd_in.parameters[3];
+	}
+	return true;
+}
+
 // PRIVMSG <target>{,<target>} <text to be sent>
 bool Parser::validatePrivmsg(ParsedCommand &cmd_in, Command &cmd_out)
+{
+	std::string::const_iterator it, end, test_target, test_channel, test_nick;
+	if (cmd_in.parameters.size() > 0)
+	{
+		it = cmd_in.parameters[0].begin();
+		end = cmd_in.parameters[0].end();
+		
+		while (is_char(it, ',') || it == cmd_in.parameters[0].begin())
+		{
+			if (is_char(it, ','))
+				it++;
+			test_target = it;
+			if (!target(test_target, end))
+				return false; // ?
+			test_channel = it;
+			test_nick = it;
+			if (channel(test_channel, end))
+			{
+				cmd_out.channels.push_back(std::string(it, test_channel));
+				it = test_channel;
+			}
+			else if (nick(test_nick, end))
+			{
+				cmd_out.users.push_back(std::string(it, test_nick));
+				it = test_nick;
+			}
+		}
+	}
+	if (cmd_in.trailing.size() > 0)
+	{
+		cmd_out.message_set = true;
+		cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
+	}
+	return true;
+}
+
+// NOTICE <target>{,<target>} <text to be sent>
+bool Parser::validateNotice(ParsedCommand &cmd_in, Command &cmd_out)
 {
 	std::string::const_iterator it, end, test_target, test_channel, test_nick;
 	if (cmd_in.parameters.size() > 0)
@@ -708,6 +776,20 @@ bool Parser::user(std::string::const_iterator &it, std::string::const_iterator &
 		return false;
 	}
 	while (it != end && nonwhite(it))
+	{
+		it++;
+	}
+	return true;
+}
+
+// <username>	::= 1*(<not in "\0\r\n @">)
+bool Parser::username(std::string::const_iterator &it, std::string::const_iterator &end)
+{
+	if (is_in(it, std::string("\0\r\n @", 5)))
+	{
+		return false;
+	}
+	while (it != end && !is_in(it, std::string("\0\r\n @", 5)))
 	{
 		it++;
 	}

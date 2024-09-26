@@ -45,8 +45,10 @@ class Parser
 		
 		static bool validateCommand(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateJoin(ParsedCommand &cmd_in, Command &cmd_out);
+		static bool validateUser(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateNick(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validatePrivmsg(ParsedCommand &cmd_in, Command &cmd_out);
+		static bool validateNotice(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateKick(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateInvite(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateTopic(ParsedCommand &cmd_in, Command &cmd_out);
@@ -98,6 +100,8 @@ class Parser
 		// OTHER
 		// <user>       ::= <nonwhite> { <nonwhite> }
 		static bool user(std::string::const_iterator &it, std::string::const_iterator &end);
+		// <username>	::= 1*(<not in "\0\r\n @">)
+		static bool username(std::string::const_iterator &it, std::string::const_iterator &end);
 		// <letter>     ::= 'a' ... 'z' | 'A' ... 'Z'
 		static bool letter(std::string::const_iterator& it);
 		// <number>     ::= '0' ... '9'
