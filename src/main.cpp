@@ -3,7 +3,7 @@
 
 int main()
 {
-	Server	server(8080, "pass");
+	Server	server(8080, "pass"); //TODO: take args
 	int fd = server.getSocketFd();
 	if (fd == -1)
 		return 1;

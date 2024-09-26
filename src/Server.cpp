@@ -216,7 +216,7 @@ void	Server::processCommand(std::string command, int fromFd)
 		{
 			commands["PASS"] = &Server::checkPassword;
 		}
-		else if (_users.find(fromFd) == _users.end())
+		else if (_users.find(fromFd) == _users.end() || _users[fromFd].empty())
 		{
 			commands["NICK"] = &Server::setNickname;
 			commands["PASS"] = &Server::checkPassword;
@@ -253,7 +253,7 @@ void	Server::processCommand(std::string command, int fromFd)
 		{
 			(this->*(command_function->second))(cmd, fromFd);
 		}
-		else if (_users.find(fromFd) == _users.end() || _users[fromFd].empty()) //TODO: check if _users added
+		else if (_users.find(fromFd) == _users.end() || _users[fromFd].empty())
 		{
 			return sendError(ERR_NOTREGISTERED, cmd, fromFd);
 		}
@@ -288,26 +288,16 @@ static bool checkValidName(const std::string &nickname)
 
 void	Server::setNickname(const Command &cmd, int fromFd)
 {
-	// 431 ERR_NONICKNAMEGIVEN
 	if (cmd.users.size() < 1)
-	{
-		sendClient(":No nickname given", fromFd);
-		return ;
-	}
+		return sendError(ERR_NONICKNAMEGIVEN, cmd, fromFd);
 	std::string nickname = cmd.users[0];
-	// 433 ERR_NICKNAMEINUSE
 	if (userExists(nickname))
-	{
-		sendClient(nickname + " :Nickname is already in use", fromFd);
-	}
-	// 432 ERR_ERRONEUSNICKNAME
-	else if (checkValidName(nickname) == false)
-	{
-		sendClient(_users[fromFd] + " :Erroneus nickname", fromFd);
-	}
+		return sendError(ERR_NICKNAMEINUSE, cmd, fromFd, nickname);
+	if (checkValidName(nickname) == false)
+		return sendError(ERR_ERRONEUSNICKNAME, cmd, fromFd, nickname);
 	// 436 ERR_NICKCOLLISION not implemented
 	// RESPONSE
-	else if (_users.find(fromFd) == _users.end() || _users[fromFd].empty()) //TODO: check if _users added
+	if (_users.find(fromFd) == _users.end() || _users[fromFd].empty())
 	{
 		sendClient(":server 001 " + nickname, fromFd);
 		_users[fromFd] = nickname;
@@ -482,7 +472,7 @@ void	Server::processMode(const Command &cmd, int fromFd)
 				ch->setHasPassword(true);
 				ch->setPassword(cmd.mode_parameters[index]);
 				processed_operations += *it;
-				processed_parameters += cmd.mode_parameters[index];
+				processed_parameters += " " + cmd.mode_parameters[index];
 				index++;
 			}
 			else if (*it == "-k")
@@ -495,7 +485,7 @@ void	Server::processMode(const Command &cmd, int fromFd)
 				ch->setHasPassword(false);
 				ch->setPassword(cmd.mode_parameters[index]);
 				processed_operations += *it;
-				processed_parameters += cmd.mode_parameters[index];
+				processed_parameters += " " + cmd.mode_parameters[index];
 				index++;
 			}
 			else if (*it == "+l")
@@ -508,7 +498,7 @@ void	Server::processMode(const Command &cmd, int fromFd)
 				ch->setHasLimit(true);
 				ch->setLimit(limit);
 				processed_operations += *it;
-				processed_parameters += cmd.mode_parameters[index];
+				processed_parameters += " " + cmd.mode_parameters[index];
 				index++;
 			}
 			else if (*it == "-l")
@@ -518,24 +508,30 @@ void	Server::processMode(const Command &cmd, int fromFd)
 			}
 			else if (*it == "+o" || *it == "-o")
 			{
+				if (cmd.mode_parameters.size() <= index)
+					continue ;
 				if (!userExists(cmd.mode_parameters[index]))
 				{
 					sendError(ERR_NOSUCHNICK, cmd, fromFd, cmd.mode_parameters[index]);
 					index++;
 					continue ;
 				}
-				if (!Channel::containsUser(ch->getUsers(), cmd.mode_parameters[index])
-					|| Channel::containsUser(ch->getOperators(), cmd.mode_parameters[index]))
+				if (!Channel::containsUser(ch->getUsers(), cmd.mode_parameters[index]))
 				{
 					index++;
 					continue ;
 				}
-				if (*it == "+o")
+				else if (*it == "+o" && !Channel::containsUser(ch->getOperators(), cmd.mode_parameters[index]))
 					ch->addOperator(cmd.mode_parameters[index]);
-				else
+				else if (*it == "-o" && Channel::containsUser(ch->getOperators(), cmd.mode_parameters[index]))
 					ch->removeOperator(cmd.mode_parameters[index]);
+				else
+				{
+					index++;
+					continue ;
+				}
 				processed_operations += *it;
-				processed_parameters += cmd.mode_parameters[index];
+				processed_parameters += " " + cmd.mode_parameters[index];
 				index++;
 			}
 			else if (*it == "+t")
@@ -553,7 +549,7 @@ void	Server::processMode(const Command &cmd, int fromFd)
 				sendError(ERR_UNKNOWNMODE, cmd, fromFd, (*it).substr(1,1));
 			}
 		}
-		std::string	message = ":" + _users[fromFd] + " MODE " + channel_name + " " + processed_operations + " " + processed_parameters;
+		std::string	message = ":" + _users[fromFd] + " MODE " + channel_name + " " + processed_operations + processed_parameters;
 		sendClient(message, fromFd);
 		sendChannel(message, channel_name, fromFd);
 	}
@@ -774,24 +770,13 @@ void	Server::quitServer(const Command &cmd, int fromFd)
 
 void	Server::checkPassword(const Command &cmd, int fromFd)
 {
-	// 461 ERR_NEEDMOREPARAMS
-	// 462 ERR_ALREADYREGISTERED
-	if (!_users[fromFd].empty())
-	{
-		std::string	message = ":server 462 " + _users[fromFd] + " :You may not reregister";
-		sendClient(message, fromFd);
-	}
-	// 464 ERR_PASSWDMISMATCH
-	else if (!cmd.message_set || cmd.message != _password)
-	{
-		std::string	message = ":server 464 " + _users[fromFd] + " :Password incorrect";
-		sendClient(message, fromFd);
-	}
-	else
-	{
-		if (!hasPassed(fromFd))
-			_passed_fds.push_back(fromFd);
-	}
+	std::map<int, std::string>::iterator it = _users.find(fromFd);
+	if (it != _users.end() && !it->second.empty())
+		return sendError(ERR_ALREADYREGISTRED, cmd, fromFd);
+	if (!cmd.message_set || cmd.message != _password)
+		return sendError(ERR_PASSWDMISMATCH, cmd, fromFd);
+	if (!hasPassed(fromFd))
+		_passed_fds.push_back(fromFd);
 }
 
 void	Server::sendChannel(std::string response, const std::string &channel, int fromFd)
