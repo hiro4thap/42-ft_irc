@@ -80,6 +80,7 @@ private:
 	std::vector<Channel>		_channels;
 	std::map<int, std::string>	_users;
 	std::vector<int>			_passed_fds;
+	std::map<int, std::string>	_remaining_command;
 
 	void			addToPfds(int fd);
 	void			delFromPfds(int fromFd);

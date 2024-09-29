@@ -206,10 +206,10 @@ void	Server::processCommand(std::string command, int fromFd)
 
 	Parser parser;
 
-	std::size_t pos_start = 0;
 	std::size_t pos_end = 0;
 	std::string	token;
-    while ((pos_end = command.find("\r\n", pos_start)) != std::string::npos)
+	_remaining_command[fromFd] += command;
+    while ((pos_end = _remaining_command[fromFd].find("\r\n")) != std::string::npos)
 	{
 		std::map<std::string, void(Server::*)(const Command&, int)> commands;
 		if (_password.empty() || !hasPassed(fromFd))
@@ -241,8 +241,8 @@ void	Server::processCommand(std::string command, int fromFd)
 		cmd.message = "";
 
 		pos_end += 2;
-        token = command.substr(pos_start, pos_end - pos_start);
-		pos_start = pos_end;
+        token = _remaining_command[fromFd].substr(0, pos_end);
+		_remaining_command[fromFd].erase(0, pos_end);
 		
 		parser.message(token, cmd);
 
