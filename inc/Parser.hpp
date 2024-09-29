@@ -28,8 +28,8 @@ struct Command
 	bool						message_set;
 	std::string					message;
 
-	bool 						threw_error;
-	int							err_response;
+	std::vector<bool> 			threw_error;
+	std::vector<int>			err_response;
 };
 
 class Parser

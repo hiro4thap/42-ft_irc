@@ -1,4 +1,5 @@
 #include "../inc/Parser.hpp"
+#include "../inc/Server.hpp"
 
 Parser::Parser()
 {
@@ -77,14 +78,23 @@ bool Parser::validateJoin(ParsedCommand &cmd_in, Command &cmd_out)
 		str = cmd_in.parameters[0];
 		it = str.begin();
 		end = str.end();
-		while (is_char(it, ',') || it == str.begin())
+		test = std::find(it, end, ',');
+		while (it != end)
 		{
 			if (is_char(it, ','))
 				it++;
-			test = it;
-			if (!channel(test, end))
-				return false; // ?
+			test = std::find(it, end, ',');
 			cmd_out.channels.push_back(std::string(it, test));
+			if (!channel(it, test))
+			{
+				cmd_out.threw_error.push_back(true);
+				cmd_out.err_response.push_back(ERR_NOSUCHNICK);
+			}
+			else
+			{
+				cmd_out.threw_error.push_back(false);
+				cmd_out.err_response.push_back(0);
+			}
 			it = test;
 		}
 	}
@@ -118,7 +128,15 @@ bool Parser::validateNick(ParsedCommand &cmd_in, Command &cmd_out)
 		std::string::const_iterator it = cmd_in.parameters[0].begin();
 		std::string::const_iterator end = cmd_in.parameters[0].end();
 		if (!nick(it, end) || *it != '\0')
-			return false;
+		{
+			cmd_out.threw_error.push_back(true);
+			cmd_out.err_response.push_back(ERR_ERRONEUSNICKNAME);
+		}
+		else 
+		{
+			cmd_out.threw_error.push_back(false);
+			cmd_out.err_response.push_back(0);
+		}
 		cmd_out.users.push_back(cmd_in.parameters[0]);
 		return true;
 	}
@@ -139,11 +157,16 @@ bool Parser::validatePrivmsg(ParsedCommand &cmd_in, Command &cmd_out)
 			if (is_char(it, ','))
 				it++;
 			test_target = it;
-			if (!target(test_target, end))
-				return false; // ?
 			test_channel = it;
 			test_nick = it;
-			if (channel(test_channel, end))
+			if (!target(test_target, end))
+			{
+				cmd_out.users.push_back(std::string(it, test_target));
+				cmd_out.threw_error.push_back(true);
+				cmd_out.err_response.push_back(ERR_NOSUCHNICK);
+				it = test_target;
+			}
+			else if (channel(test_channel, end))
 			{
 				cmd_out.channels.push_back(std::string(it, test_channel));
 				it = test_channel;
@@ -151,6 +174,8 @@ bool Parser::validatePrivmsg(ParsedCommand &cmd_in, Command &cmd_out)
 			else if (nick(test_nick, end))
 			{
 				cmd_out.users.push_back(std::string(it, test_nick));
+				cmd_out.threw_error.push_back(false);
+				cmd_out.err_response.push_back(0);
 				it = test_nick;
 			}
 		}
@@ -174,7 +199,15 @@ bool Parser::validateKick(ParsedCommand &cmd_in, Command &cmd_out)
 		it = str.begin();
 		end = str.end();
 		if (!channel(it, end) && *it != '\0')
-			return false; // ?
+		{
+			cmd_out.threw_error.push_back(true);
+			cmd_out.err_response.push_back(ERR_NOSUCHNICK);
+		}
+		else
+		{
+			cmd_out.threw_error.push_back(false);
+			cmd_out.err_response.push_back(0);
+		}
 		cmd_out.channels.push_back(cmd_in.parameters[0]);
 	}
 	if (cmd_in.parameters.size() > 1)
@@ -182,14 +215,23 @@ bool Parser::validateKick(ParsedCommand &cmd_in, Command &cmd_out)
 		str = cmd_in.parameters[1];
 		it = str.begin();
 		end = str.end();
-		while (is_char(it, ',') || it == str.begin())
+		test = std::find(it, end, ',');
+		while (it != end)
 		{
-			if (it != str.begin())
+			if (is_char(it, ','))
 				it++;
-			test = it;
-			if (!user(test, end))
-				return false; // ?
+			test = std::find(it, end, ',');
 			cmd_out.users.push_back(std::string(it, test));
+			if (!user(it, test))
+			{
+				cmd_out.threw_error.push_back(true);
+				cmd_out.err_response.push_back(ERR_NOSUCHNICK);
+			}
+			else
+			{
+				cmd_out.threw_error.push_back(false);
+				cmd_out.err_response.push_back(0);
+			}
 			it = test;
 		}
 	}
@@ -212,7 +254,15 @@ bool Parser::validateInvite(ParsedCommand &cmd_in, Command &cmd_out)
 		it = str.begin();
 		end = str.end();
 		if (!nick(it, end) || *it != '\0')
-			return false;
+		{
+			cmd_out.threw_error.push_back(true);
+			cmd_out.err_response.push_back(ERR_NOSUCHNICK);
+		}
+		else
+		{
+			cmd_out.threw_error.push_back(false);
+			cmd_out.err_response.push_back(0);
+		}
 		cmd_out.users.push_back(str);
 	}
 	if (cmd_in.parameters.size() > 1)
@@ -221,7 +271,15 @@ bool Parser::validateInvite(ParsedCommand &cmd_in, Command &cmd_out)
 		it = str.begin();
 		end = str.end();
 		if (!channel(it, end) || *it != '\0')
-			return false;
+		{
+			cmd_out.threw_error.push_back(true);
+			cmd_out.err_response.push_back(ERR_NOSUCHNICK);
+		}
+		else
+		{
+			cmd_out.threw_error.push_back(false);
+			cmd_out.err_response.push_back(0);
+		}
 		cmd_out.channels.push_back(str);
 	}
 	return true;
@@ -238,7 +296,15 @@ bool Parser::validateTopic(ParsedCommand &cmd_in, Command &cmd_out)
 		it = str.begin();
 		end = str.end();
 		if (!channel(it, end) || *it != '\0')
-			return false;
+		{
+			cmd_out.threw_error.push_back(true);
+			cmd_out.err_response.push_back(ERR_NOSUCHNICK);
+		}
+		else
+		{
+			cmd_out.threw_error.push_back(false);
+			cmd_out.err_response.push_back(0);
+		}
 		cmd_out.channels.push_back(str);
 	}
 	if (cmd_in.trailing.size() > 0)
@@ -261,12 +327,20 @@ bool Parser::validateMode(ParsedCommand &cmd_in, Command &cmd_out)
 		it = str.begin();
 		end = str.end();
 		if (!channel(it, end) || *it != '\0')
-			return false;
+		{
+			cmd_out.threw_error.push_back(true);
+			cmd_out.err_response.push_back(ERR_NOSUCHNICK);
+		}
+		else
+		{
+			cmd_out.threw_error.push_back(false);
+			cmd_out.err_response.push_back(0);
+		}
 		cmd_out.channels.push_back(str);
 	}
 	if (cmd_in.parameters.size() > 1)
 	{
-		cmd_out.threw_error = !modestring(cmd_in.parameters[1], cmd_out);
+		modestring(cmd_in.parameters[1], cmd_out);
 	}
 	std::size_t i = 2;
 	while (i < cmd_in.parameters.size())
@@ -314,14 +388,23 @@ bool Parser::validatePart(ParsedCommand &cmd_in, Command &cmd_out)
 		str = cmd_in.parameters[0];
 		it = str.begin();
 		end = str.end();
-		while (is_char(it, ',') || it == str.begin())
+		test = std::find(it, end, ',');
+		while (it != end)
 		{
-			if (it != str.begin())
+			if (is_char(it, ','))
 				it++;
-			test = it;
-			if (!channel(test, end))
-				return false; // ?
+			test = std::find(it, end, ',');
 			cmd_out.channels.push_back(std::string(it, test));
+			if (!channel(it, test))
+			{
+				cmd_out.threw_error.push_back(true);
+				cmd_out.err_response.push_back(ERR_NOSUCHNICK);
+			}
+			else
+			{
+				cmd_out.threw_error.push_back(false);
+				cmd_out.err_response.push_back(0);
+			}
 			it = test;
 		}
 	}
@@ -660,8 +743,7 @@ bool Parser::nick(std::string::const_iterator &it, std::string::const_iterator &
 		return false;
 	}
 	it++;
-	count++;
-	while ((letter(it) || number(it) || special(it)))
+	while (letter(it) || number(it) || special(it) || *it == '-')
 	{
 		it++;
 		count++;
@@ -669,7 +751,7 @@ bool Parser::nick(std::string::const_iterator &it, std::string::const_iterator &
 			break ;
 		continue;
 	}
-	if (count >= 8)
+	if (count > 8)
 		return false;
 	return true;
 }
