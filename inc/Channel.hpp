@@ -4,6 +4,10 @@
 # include <iostream>
 # include <sstream>
 # include <vector>
+# include <ctime>
+# include <algorithm>
+
+# include "Log.hpp"
 
 typedef std::vector<std::string>::const_iterator user_it; 
 
@@ -30,6 +34,7 @@ public:
 	bool				getHasLimit() const;
 	void				setLimit(std::size_t value);
 	std::size_t			getLimit() const;
+	const std::string	getModes() const;
 	const std::vector<std::string>	&getUsers() const;
 	void				addUser(const std::string &user);
 	void				removeUser(const std::string &user);

@@ -107,6 +107,31 @@ std::size_t	Channel::getLimit() const
 	return this->_limit;
 }
 
+const std::string	Channel::getModes() const
+{
+	std::string	limit_arg = "";
+	std::string	password_arg = "";
+	std::string mode_list = "";
+	if (this->getIsInviteOnly())
+		mode_list += "i";
+	if (this->getHasPassword())
+		mode_list += "k";
+	if (this->getHasLimit())
+	{
+		mode_list += "l";
+		limit_arg = " " + Log::str(this->getLimit());
+	}
+	if (this->getHasRestrictTopic())
+	{
+		mode_list += "t";
+		password_arg = " " + this->getPassword();
+	}
+	std::string message = "";
+	if (mode_list.size() > 0)
+		message += " +" + mode_list + limit_arg + password_arg;
+	return message;
+}
+
 const std::vector<std::string>	&Channel::getUsers() const
 {
 	return _users;
