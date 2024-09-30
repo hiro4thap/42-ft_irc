@@ -401,7 +401,7 @@ void Server::sendReply(enum Replies rpl_code, int requesting_client_fd, std::str
 	// rpl_msg[RPL_MOTDSTART]			= "- <server> Message of the day - ";
 	rpl_msg[RPL_ENDOFMOTD]			= "End of /MOTD command.";
 
-	std::string message = ":Server " + Log::str(rpl_code) + " " + _users[requesting_client_fd] + " ";
+	std::string message = ":Server " + Log::str(rpl_code, 3, '0') + " " + _users[requesting_client_fd] + " ";
 	if (extra_prefix.size() > 0)
 		message += extra_prefix + " ";
 	if (!no_colon)

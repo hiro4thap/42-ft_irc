@@ -4,6 +4,7 @@
 # include <string>
 # include <iostream>
 # include <sstream>
+# include <iomanip>
 
 # define COLOR_NONE		""
 # define COLOR_RED		"\033[0;31m"
@@ -23,16 +24,22 @@ class	Log
 		static void	err(std::string message = "", std::string color = COLOR_RED);
 
 		template <typename T>
-		static std::string str(T t) 
+		static std::string str(T t, int field_width = -1, char fill = ' ') 
 		{
 			std::stringstream	stream;
+			if (fill != ' ')
+				stream << std::setfill(fill);
+			if (field_width > 0)
+				stream << std::setw(field_width);
 			stream << t;
 			return (stream.str());
 		}
 		
 		template <>
-		std::string str<bool>(bool t)
+		std::string str<bool>(bool t, int field_width, char fill)
 		{
+			(void) field_width;
+			(void) fill;
 			if (t)
 				return "true";
 			return "false";
