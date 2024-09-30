@@ -294,13 +294,18 @@ void	Server::setNickname(const Command &cmd, int fromFd)
 	// RESPONSE
 	if (_users.find(fromFd) == _users.end() || _users[fromFd].empty())
 	{
-		sendClient(":server 001 " + nickname, fromFd);
+		sendReply(RPL_WELCOME, fromFd, "", "Welcome " + nickname, true);
+		// sendClient(":server 001 " + nickname, fromFd);
 		_users[fromFd] = nickname;
 	}
 	else
 	{
-		sendClient(":" + _users[fromFd] + " NICK " + nickname, fromFd);
-		sendAllClients(":" + _users[fromFd] + " NICK " + nickname, fromFd);
+		sendAllClients(
+			sendReply("NICK", fromFd, nickname), 
+			fromFd
+		);
+		// sendClient(":" + _users[fromFd] + " NICK " + nickname, fromFd);
+		// sendAllClients(":" + _users[fromFd] + " NICK " + nickname, fromFd);
 		_users[fromFd] = nickname;
 	}
 }
