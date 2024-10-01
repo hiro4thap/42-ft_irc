@@ -657,7 +657,7 @@ void	Server::sendMessage(const Command &cmd, int fromFd)
 	for (std::size_t i = 0; i < cmd.users.size(); i++)
 	{
 		if (cmd.threw_error[i] && cmd.err_response[i] == ERR_NOSUCHCHANNEL)
-			return sendError(ERR_NOSUCHCHANNEL, fromFd, cmd.users[i]);
+			sendError(ERR_NOSUCHCHANNEL, fromFd, cmd.users[i]);
 		if (userExists(cmd.users[i]))
 			sendCommand("PRIVMSG", fromFd, getUserFd(cmd.users[i]), cmd.message);
 			// sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.message, getUserFd(cmd.users[i]));
