@@ -95,11 +95,9 @@ public:
 	void	launch(int serverSocket);
 	
 private:
-	struct pollfd						*_pfds; //TODO: type is to be changed as vector<struct pollfd>
+	std::vector<struct pollfd>			_pfds;
 	unsigned int						_port;
 	std::string							_password;
-	unsigned int						_capacity;
-	unsigned int						_size;
 	std::vector<Channel>				_channels;
 	std::map<int, std::string>			_users;
 	std::map<std::string, user_info>	_user_info;

@@ -6,13 +6,11 @@ Server::Server()
 
 Server::~Server()
 {
-	delete[] _pfds;
 }
 
 Server::Server(unsigned int port, std::string password):
-	_port(port), _password(password), _capacity(5), _size(0)
+	_port(port), _password(password)
 {
-	_pfds = new struct pollfd[_capacity];
 }
 
 
@@ -50,9 +48,9 @@ int	Server::getSocketFd()
 		return -1;
 	}
 
+	_pfds.resize(1);
 	_pfds[0].fd = serverSocket;
 	_pfds[0].events = POLLIN;
-	_size = 1;
 
 	return serverSocket;
 }
@@ -61,15 +59,15 @@ void	Server::launch(int serverSocket)
 {
 	while (true)
 	{
-		poll(_pfds, _size, -1);
-		for (unsigned int i = 0; i < _size; i++)
+		poll(_pfds.data(), _pfds.size(), -1);
+		for (unsigned int i = 0; i < _pfds.size(); i++)
 		{
 			if (_pfds[i].revents != POLLIN)
 				continue ;
 			// accepting connection request
 			if (_pfds[i].fd == serverSocket)
 			{
-				std::cout << "Client " << _size << " is accepted" << std::endl;
+				std::cout << "Client " << _pfds.size() << " is accepted" << std::endl;
 				int clientSocket = accept(serverSocket, NULL, NULL);
 				if (clientSocket == -1)
 				{
@@ -100,18 +98,10 @@ void	Server::launch(int serverSocket)
 
 void	Server::addToPfds(int fd)
 {
-	if (_size == _capacity)
-	{
-		_capacity *= 2;
-		struct pollfd	*new_pfds = new struct pollfd[_capacity];
-		for (unsigned int i = 0; i < _size; i++)
-			new_pfds[i] = _pfds[i];
-		delete[] _pfds;
-		_pfds = new_pfds;
-	}
-	_pfds[_size].fd = fd;
-	_pfds[_size].events = POLLIN;
-	_size++;
+	struct pollfd	pfd;
+	pfd.fd = fd;
+	pfd.events = POLLIN;
+	_pfds.push_back(pfd);
 }
 
 void	Server::delFromPfds(int fromFd)
@@ -131,7 +121,7 @@ void	Server::delFromPfds(int fromFd)
 		_users.erase(fromFd);
 	if (_remaining_command.find(fromFd) != _remaining_command.end())
 		_remaining_command.erase(fromFd);
-	for (std::size_t i = 0; i < _size; i++)
+	for (std::size_t i = 0; i < _pfds.size(); i++)
 	{
 		if (_pfds[i].fd != fromFd)
 			continue ;
@@ -640,7 +630,7 @@ void	Server::processMode(const Command &cmd, int fromFd)
 
 void	Server::sendAllClients(std::string response, int fromFd)
 {
-	for (std::size_t i = 0; i < _size; i++)
+	for (std::size_t i = 0; i < _pfds.size(); i++)
 	{
 		int fd = _pfds[i].fd;
 		if (fd == fromFd)
