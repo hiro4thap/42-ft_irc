@@ -38,12 +38,15 @@ public:
 	const std::vector<std::string>	&getUsers() const;
 	void				addUser(const std::string &user);
 	void				removeUser(const std::string &user);
+	void				replaceUser(const std::string &old_name, const std::string &new_name);
 	const std::vector<std::string>	&getOperators() const;
 	void				addOperator(const std::string &user);
 	void				removeOperator(const std::string &user);
+	void				replaceOperator(const std::string &old_name, const std::string &new_name);
 	const std::vector<std::string>	&getInvitedUsers() const;
 	void				addInvitedUser(const std::string &user);
 	void				removeInvitedUser(const std::string &user);
+	void				replaceInvitedUser(const std::string &old_name, const std::string &new_name);
 
 	static bool			containsUser(const std::vector<std::string> &user_list, const std::string &user);
 	static bool			validChannelName(const std::string &name);

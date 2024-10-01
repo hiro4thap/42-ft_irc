@@ -129,6 +129,8 @@ void	Server::delFromPfds(int fromFd)
 	}
 	if (_users.find(fromFd) != _users.end())
 		_users.erase(fromFd);
+	if (_remaining_command.find(fromFd) != _remaining_command.end())
+		_remaining_command.erase(fromFd);
 	for (std::size_t i = 0; i < _size; i++)
 	{
 		if (_pfds[i].fd != fromFd)
@@ -255,7 +257,7 @@ void	Server::processCommand(std::string command, int fromFd)
 		}
 		else if (_users.find(fromFd) == _users.end() || _users[fromFd].empty())
 		{
-			return sendError(ERR_NOTREGISTERED, fromFd);
+			sendError(ERR_NOTREGISTERED, fromFd);
 		}
     }
 }
@@ -300,12 +302,16 @@ void	Server::setNickname(const Command &cmd, int fromFd)
 	}
 	else
 	{
+		for (std::size_t i = 0; i < _channels.size(); i++)
+		{
+			_channels[i].replaceUser(_users[fromFd], nickname);
+			_channels[i].replaceOperator(_users[fromFd], nickname);
+			_channels[i].replaceInvitedUser(_users[fromFd], nickname);
+		}
 		sendAllClients(
 			sendReply("NICK", fromFd, nickname), 
 			fromFd
 		);
-		// sendClient(":" + _users[fromFd] + " NICK " + nickname, fromFd);
-		// sendAllClients(":" + _users[fromFd] + " NICK " + nickname, fromFd);
 		_users[fromFd] = nickname;
 	}
 }
@@ -771,25 +777,16 @@ void	Server::inviteUser(const Command &cmd, int fromFd)
 		return sendError(ERR_NOTONCHANNEL, fromFd, channel_name);
 	if (ch->getIsInviteOnly() && Channel::containsUser(ch->getOperators(), _users[fromFd]) == false)
 		return sendError(ERR_CHANOPRIVSNEEDED, fromFd, channel_name);
-	
-	// 341 RPL_INVITING
-	if (ch && Channel::containsUser(ch->getInvitedUsers(), cmd.users[0]))
-	{
-		return sendReply(RPL_INVITING, fromFd, "", cmd.users[0] + " " + channel_name, true);
-		// std::string message = ":server 341 " + _users[fromFd] + " " + cmd.users[0] + " " + channel_name; //TODO: needs to store who invited a user
-		// sendClient(message, fromFd);
-		// return ;
-	}
-
 	// 443 ERR_USERONCHAN
 	if (ch && Channel::containsUser(ch->getUsers(), cmd.users[0]))
 		return sendError(ERR_USERONCHANNEL, fromFd, channel_name);
 
+	// 341 RPL_INVITING
 	// RESPONSE
-	ch->addInvitedUser(cmd.users[0]);
+	if (!Channel::containsUser(ch->getInvitedUsers(), cmd.users[0]))
+		ch->addInvitedUser(cmd.users[0]);
+	sendReply(RPL_INVITING, fromFd, "", cmd.users[0] + " " + channel_name, true);
 	sendCommand("INVITE", fromFd, getUserFd(cmd.users[0]), cmd.users[0] + " :" + channel_name);
-	// std::string	message = ":" + _users[fromFd] + " INVITE " + cmd.users[0] + " :" + channel_name;
-	// sendClient(message, getUserFd(cmd.users[0]));
 }
 
 // TOPIC command

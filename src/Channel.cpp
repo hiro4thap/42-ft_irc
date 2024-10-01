@@ -149,6 +149,11 @@ void	Channel::removeUser(const std::string &user)
 		_users.erase(it);
 }
 
+void	Channel::replaceUser(const std::string &old_name, const std::string &new_name)
+{
+	std::replace(_users.begin(), _users.end(), old_name, new_name);
+}
+
 const std::vector<std::string>	&Channel::getOperators() const
 {
 	return _operators;
@@ -166,6 +171,11 @@ void	Channel::removeOperator(const std::string &user)
 		_operators.erase(it);
 }
 
+void	Channel::replaceOperator(const std::string &old_name, const std::string &new_name)
+{
+	std::replace(_operators.begin(), _operators.end(), old_name, new_name);
+}
+
 const std::vector<std::string>	&Channel::getInvitedUsers() const
 {
 	return _invited_users;
@@ -181,6 +191,11 @@ void	Channel::removeInvitedUser(const std::string &user)
 	std::vector<std::string>::iterator it = std::find(_invited_users.begin(), _invited_users.end(), user);
 	if (it != _invited_users.end())
 		_invited_users.erase(it);
+}
+
+void	Channel::replaceInvitedUser(const std::string &old_name, const std::string &new_name)
+{
+	std::replace(_invited_users.begin(), _invited_users.end(), old_name, new_name);
 }
 
 bool	Channel::containsUser(const std::vector<std::string> &user_list, const std::string &user)
