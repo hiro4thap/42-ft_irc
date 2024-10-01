@@ -286,9 +286,9 @@ void	Server::setNickname(const Command &cmd, int fromFd)
 	// RESPONSE
 	if (_users.find(fromFd) == _users.end() || _users[fromFd].empty())
 	{
-		sendReply(RPL_WELCOME, fromFd, "", "Welcome " + nickname, true);
-		// sendClient(":server 001 " + nickname, fromFd);
 		_users[fromFd] = nickname;
+		sendReply(RPL_WELCOME, fromFd, "", ":Welcome " + nickname, true);
+		// sendClient(":server 001 " + nickname, fromFd);
 	}
 	else
 	{
@@ -482,7 +482,7 @@ void	Server::joinChannel(const Command &cmd, int fromFd)
 			sendReply(RPL_TOPIC, fromFd, channel_name, ch->getTopic());
 			sendReply(RPL_TOPICWHOTIME, fromFd, channel_name, ch->getTopicSetBy() + " " + ch->getTopicSetAt(), true);
 		}
-		sendReply(RPL_NAMREPLY, fromFd, channel_name, getNameList(ch));
+		sendReply(RPL_NAMREPLY, fromFd, "= " + channel_name, getNameList(ch));
 		sendReply(RPL_ENDOFNAMES, fromFd, channel_name);
 	}
 }
