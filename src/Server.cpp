@@ -1,9 +1,5 @@
 #include "../inc/Server.hpp"
 
-Server::Server()
-{
-}
-
 Server::~Server()
 {
 }
@@ -66,6 +62,13 @@ int	Server::getSocketFd()
 void	Server::launch(int serverSocket)
 {
 	Log::nl("Listening on " + _ipv4_address + "/" + Log::str(_port) + "...", COLOR_MAGENTA);
+	
+	// Load bot
+	_users[_bot.getFd()] = new User(_bot.getFd());
+	_bot.setupBot(_users[_bot.getFd()]);
+	
+	processCommand("JOIN " + _bot.getChannel() + "\r\n", _bot.getFd());
+
 	while (true)
 	{
 		poll(_pfds.data(), _pfds.size(), -1);
@@ -210,7 +213,21 @@ void	Server::sendClient(std::string message, int toFd)
 {
 	std::string response = message + "\r\n";
 	int serverSocket = _pfds[0].fd;
-	if (toFd != serverSocket)
+	if (toFd == _bot.getFd())
+	{
+		Command cmd = _bot.proccessMessage(message);
+		if (cmd.threw_error.at(0))
+			return ;
+		cmd.message += "\r\n";
+
+		if (send(getUserFd(cmd.users[0]), cmd.message.c_str() , cmd.message.size(), 0) == -1)
+			perror("send");
+		Log::out("[Server -> \"" + _users[toFd]->getNickname() + "\"] ", COLOR_CYAN);
+		Log::nl(response);
+		Log::out("\"" + _users[toFd]->getNickname() + " -> \"" + cmd.users[0] + "\"] ", COLOR_CYAN);
+		Log::nl(cmd.message);
+	}
+	else if (toFd != serverSocket)
 	{
 		if (send(toFd, response.c_str() , response.size(), 0) == -1)
 			perror("send");
