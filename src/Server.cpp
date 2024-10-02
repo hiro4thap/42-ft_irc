@@ -71,7 +71,7 @@ void	Server::launch(int serverSocket)
 		poll(_pfds.data(), _pfds.size(), -1);
 		for (unsigned int i = 0; i < _pfds.size(); i++)
 		{
-			if (_pfds[i].revents != POLLIN)
+			if (!(_pfds[i].revents & POLLIN))
 				continue ;
 			// accepting connection request
 			if (_pfds[i].fd == serverSocket)
@@ -87,6 +87,14 @@ void	Server::launch(int serverSocket)
 				}
 				addToPfds(clientSocket);
 				_users[clientSocket] = new User(clientSocket);
+			}
+			// remove user if disconnected
+			else if (_pfds[i].revents & POLLHUP)
+			{
+				if (_users[_pfds[i].fd]->isRegistered())
+					processCommand("QUIT :client's process is terminated\r\n", _pfds[i].fd);
+				else
+					delFromPfds(_pfds[i].fd);
 			}
 			// recieving data
 			else
@@ -117,6 +125,7 @@ void	Server::addToPfds(int fd)
 	struct pollfd	pfd;
 	pfd.fd = fd;
 	pfd.events = POLLIN;
+	pfd.revents = 0;
 	_pfds.push_back(pfd);
 }
 
@@ -515,7 +524,9 @@ void	Server::joinChannel(const Command &cmd, int fromFd)
 		}
 		Channel *ch = getChannelByName(channel_name);
 
-		if (ch->getHasPassword() && (cmd.keys.size() < i + 1 || ch->checkPassword(cmd.keys[i]) == false))
+		if (Channel::containsUser(ch->getUsers(), _users[fromFd]->getNickname()))
+			continue ;
+		else if (ch->getHasPassword() && (cmd.keys.size() < i + 1 || ch->checkPassword(cmd.keys[i]) == false))
 			sendError(ERR_BADCHANNELKEY, fromFd, channel_name);
 		else if (ch->getHasLimit() && ch->getUsers().size() >= ch->getLimit())
 			sendError(ERR_CHANNELISFULL, fromFd, channel_name);
