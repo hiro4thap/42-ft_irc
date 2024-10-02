@@ -1,7 +1,8 @@
 #include "../inc/User.hpp"
 
 User::User(int fd): 
-	_socket_fd(fd), _authenticated(false), _registered(false), _registration_state(CONNECTED)
+	_socket_fd(fd), _authenticated(false), _registered(false), _registration_state(CONNECTED),
+	_nickname(""), _username(""), _real_name("")
 {
 }
 

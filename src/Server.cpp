@@ -22,6 +22,7 @@ Server::Server(unsigned int port, std::string password):
 
 int	Server::getSocketFd()
 {
+	Log::out("Starting IRC Server... ", COLOR_MAGENTA);
     // creating socket
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -58,11 +59,13 @@ int	Server::getSocketFd()
 	_pfds[0].fd = serverSocket;
 	_pfds[0].events = POLLIN;
 
+	Log::nl("Done!", COLOR_MAGENTA);
 	return serverSocket;
 }
 
 void	Server::launch(int serverSocket)
 {
+	Log::nl("Listening on " + _ipv4_address + "/" + Log::str(_port) + "...", COLOR_MAGENTA);
 	while (true)
 	{
 		poll(_pfds.data(), _pfds.size(), -1);
@@ -73,7 +76,8 @@ void	Server::launch(int serverSocket)
 			// accepting connection request
 			if (_pfds[i].fd == serverSocket)
 			{
-				std::cout << "Client " << _pfds.size() << " is accepted" << std::endl;
+				Log::nl("Client " + Log::str(_pfds.size()) + " is accepted", COLOR_YELLOW);
+				// std::cout << "Client " << _pfds.size() << " is accepted" << std::endl;
 				int clientSocket = accept(serverSocket, NULL, NULL);
 				if (clientSocket == -1)
 				{
@@ -94,13 +98,18 @@ void	Server::launch(int serverSocket)
 					delFromPfds(_pfds[i].fd);
 					continue ;
 				}
-				std::cout << "Message from client " << i << " :" << buffer << std::endl;
+				std::string client_name = "";
+				if (i < _pfds.size() && _users.find(_pfds[i].fd) != _users.end())
+					client_name = _users[_pfds[i].fd]->getNickname();
+				Log::out("[Client " + Log::str(i) + ": \"" + client_name + "\"] ", COLOR_YELLOW);
+				Log::nl(buffer);
+				// std::cout << "Message from client " << i << " :" << buffer << std::endl;
 				processCommand(buffer, _pfds[i].fd);
 			}
 		}
 	}
-    // closing the socket.
-    close(serverSocket);
+	// closing the socket.
+	close(serverSocket);
 }
 
 void	Server::addToPfds(int fd)
@@ -205,6 +214,8 @@ void	Server::sendClient(std::string message, int toFd)
 	{
 		if (send(toFd, response.c_str() , response.size(), 0) == -1)
 			perror("send");
+		Log::out("[Server -> \"" + _users[toFd]->getNickname() + "\"] ", COLOR_CYAN);
+		Log::nl(response);
 	}
 }
 
@@ -219,27 +230,27 @@ void	Server::processCommand(std::string command, int fromFd)
 		std::map<std::string, void(Server::*)(const Command&, int)> commands;
 		if (this->_requires_authentication && user->isAuthenticated() == false)
 		{
-			commands["PASS"] = &Server::checkPassword;
+			commands["PASS"]	= &Server::checkPassword;
 		}
 		else if (user->getRegistrationState() < REGISTERED)
 		{
-			commands["NICK"] = &Server::setNickname;
-			commands["USER"] = &Server::setUser;
-			commands["PASS"] = &Server::checkPassword;
+			commands["NICK"]	= &Server::setNickname;
+			commands["USER"]	= &Server::setUser;
+			commands["PASS"]	= &Server::checkPassword;
 		}
 		else
 		{
-			commands["JOIN"] = &Server::joinChannel;
-			commands["NICK"] = &Server::setNickname;
-			commands["PRIVMSG"] = &Server::sendMessage;
-			commands["NOTICE"] = &Server::sendNotice;
-			commands["KICK"] = &Server::kickUser;
-			commands["INVITE"] = &Server::inviteUser;
-			commands["TOPIC"] = &Server::processTopic;
-			commands["MODE"] = &Server::processMode;
-			commands["PART"] = &Server::leaveChannel;
-			commands["QUIT"] = &Server::quitServer;
-			commands["PASS"] = &Server::checkPassword;
+			commands["JOIN"]	= &Server::joinChannel;
+			commands["NICK"]	= &Server::setNickname;
+			commands["PRIVMSG"]	= &Server::sendMessage;
+			commands["NOTICE"]	= &Server::sendNotice;
+			commands["KICK"]	= &Server::kickUser;
+			commands["INVITE"]	= &Server::inviteUser;
+			commands["TOPIC"]	= &Server::processTopic;
+			commands["MODE"]	= &Server::processMode;
+			commands["PART"]	= &Server::leaveChannel;
+			commands["QUIT"]	= &Server::quitServer;
+			commands["PASS"]	= &Server::checkPassword;
 		}
 
 		Command cmd;
@@ -270,9 +281,9 @@ void	Server::processCommand(std::string command, int fromFd)
 			sendReply(RPL_WELCOME, user->getFd(), "", "Welcome to the 42 Internet Relay Chat Network " + user->getNickname());
 			sendReply(RPL_YOURHOST, user->getFd(),"", "Your host is " + _servername + "[" + _ipv4_address + "/" + Log::str(_port) + "], running version " + _version);
 			sendReply(RPL_CREATED, user->getFd(), "", "This server was created " + this->getTimeCreated());
-			sendReply(RPL_MYINFO, user->getFd(), _servername + " " + _version, "o iklot ko				l", true);
+			// sendReply(RPL_MYINFO, user->getFd(), _servername + " " + _version, "o iklot ko				l", true);
 			sendReply(RPL_ISUPPORT, user->getFd(), "NICKLEN=9 CHANMODES=,k,l,it");
-			sendReply(RPL_LUSERCLIENT, user->getFd(), "There are " + Log::str(registered_users) + " users and 0 invisible on 1 servers");
+			sendReply(RPL_LUSERCLIENT, user->getFd(), "", "There are " + Log::str(registered_users) + " users and 0 invisible on 1 servers");
 			sendReply(RPL_LUSERCHANNELS, user->getFd(), Log::str(_channels.size()));
 			sendReply(RPL_LUSERME, user->getFd(), "", "I have " + Log::str(registered_users) + " and 1 servers");
 			if (_motd_set)
@@ -703,7 +714,7 @@ void	Server::sendMessage(const Command &cmd, int fromFd)
 		if (cmd.threw_error[i] && cmd.err_response[i] == ERR_NOSUCHCHANNEL)
 			sendError(ERR_NOSUCHCHANNEL, fromFd, cmd.users[i]);
 		if (userExists(cmd.users[i]))
-			sendCommand("PRIVMSG", fromFd, getUserFd(cmd.users[i]), cmd.message);
+			sendCommand("PRIVMSG", fromFd, getUserFd(cmd.users[i]), ":" + cmd.message);
 			// sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.message, getUserFd(cmd.users[i]));
 		else
 			sendError(ERR_NOSUCHNICK, fromFd, cmd.users[i]);

@@ -113,7 +113,7 @@ private:
 	bool								_motd_set;
 	std::vector<Channel>				_channels;
 	// std::map<int, std::string>			_users;
-	std::map<int, User*>					_users;
+	std::map<int, User*>				_users;
 	// std::map<std::string, user_info>	_user_info;
 	// std::vector<int>					_passed_fds;
 	std::map<int, std::string>			_remaining_command;
