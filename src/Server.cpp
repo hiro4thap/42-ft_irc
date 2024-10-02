@@ -6,19 +6,28 @@ Server::Server()
 
 Server::~Server()
 {
+	Log::nl("\nStopping IRC Server... ", COLOR_MAGENTA);
+	for (std::map<int, User *>::iterator it = _users.begin(); it != _users.end(); it++)
+	{
+		std::string	nick = it->second->getNickname();
+		delete it->second;
+		Log::nl("User " + nick + " has been deleted", COLOR_YELLOW);
+	}
+	for (std::vector<struct pollfd>::iterator it = _pfds.begin(); it < _pfds.end(); it++)
+	{
+		close(it->fd);
+		Log::nl("File descriptor " + Log::str(it->fd) + " has been closed", COLOR_YELLOW);
+	}
+	Log::nl("Done!", COLOR_MAGENTA);
 }
 
 Server::Server(unsigned int port, std::string password):
 	_port(port), _servername("localhost"),_ipv4_address("127.0.0.1"),
-	_version("0.9.0"), _password(password), _motd_set(false)
+	_version("0.9.0"), _requires_authentication(true),
+	_password(password), _motd_set(false)
 {
-	if (_password.empty())
-		_requires_authentication = false;
-	else
-		_requires_authentication = true;
 	_server_created = time(0);
 }
-
 
 int	Server::getSocketFd()
 {
@@ -725,7 +734,7 @@ void	Server::sendMessage(const Command &cmd, int fromFd)
 		if (cmd.threw_error[i] && cmd.err_response[i] == ERR_NOSUCHCHANNEL)
 			sendError(ERR_NOSUCHCHANNEL, fromFd, cmd.users[i]);
 		if (userExists(cmd.users[i]))
-			sendCommand("PRIVMSG", fromFd, getUserFd(cmd.users[i]), ":" + cmd.message);
+			sendCommand("PRIVMSG", fromFd, getUserFd(cmd.users[i]), cmd.users[i] + " :" + cmd.message);
 			// sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.message, getUserFd(cmd.users[i]));
 		else
 			sendError(ERR_NOSUCHNICK, fromFd, cmd.users[i]);
