@@ -285,6 +285,7 @@ void	Server::processCommand(std::string command, int fromFd)
 			commands["PART"]	= &Server::leaveChannel;
 			commands["QUIT"]	= &Server::quitServer;
 			commands["PASS"]	= &Server::checkPassword;
+			commands["USER"]	= &Server::setUser;
 		}
 
 		Command cmd;
@@ -399,7 +400,7 @@ void	Server::setUser(const Command &cmd, int fromFd)
 {
 	User* user = _users[fromFd];
 
-	if (cmd.users.empty())
+	if (cmd.threw_error[0] && cmd.err_response[0] == ERR_NEEDMOREPARAMS)
 		return sendError(ERR_NEEDMOREPARAMS, fromFd);
 	if (user->getRegistrationState() == PROVIDED_USER 
 		|| user->getRegistrationState() == REGISTERED)

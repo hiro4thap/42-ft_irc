@@ -145,31 +145,29 @@ bool Parser::validateNick(ParsedCommand &cmd_in, Command &cmd_out)
 	return true;
 }
 
-// USER <username> 0 * <realname>
+// USER <username> <hostname> <servername> <realname>
+// * only validate the size of commands
 bool Parser::validateUser(ParsedCommand &cmd_in, Command &cmd_out)
 {
-	if (cmd_in.parameters.size() > 0)
+	if (cmd_in.parameters.size() < 3
+		|| (cmd_in.parameters.size() == 3 && cmd_in.trailing.empty()))
 	{
-		std::string::const_iterator it = cmd_in.parameters[0].begin();
-		std::string::const_iterator end = cmd_in.parameters[0].end();
-		if (!username(it, end) || *it != '\0')
-			return false;
-		cmd_out.users.push_back(cmd_in.parameters[0]);
+		cmd_out.threw_error.push_back(true);
+		cmd_out.err_response.push_back(ERR_NEEDMOREPARAMS);
+		return false;
 	}
-	if (cmd_in.parameters.size() > 1 && cmd_in.parameters[1] != "0")
-		return false;
-	if (cmd_in.parameters.size() > 2 && cmd_in.parameters[2] != "*")
-		return false;
-	if (!(cmd_in.parameters.size() > 3) && cmd_in.trailing.empty())
-		return false;
 	else
 	{
-		cmd_out.message_set = true;
-		if (!cmd_in.trailing.empty())
-			cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
-		else
-			cmd_out.message = cmd_in.parameters[3];
+		cmd_out.threw_error.push_back(false);
+		cmd_out.err_response.push_back(0);
 	}
+	cmd_out.message_set = true;
+	for (std::size_t i = 0; i < 3; i++)
+		cmd_out.users.push_back(cmd_in.parameters[i]);
+	if (!cmd_in.trailing.empty())
+		cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
+	else
+		cmd_out.message = cmd_in.parameters[3];
 	return true;
 }
 
