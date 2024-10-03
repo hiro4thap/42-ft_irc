@@ -561,8 +561,10 @@ void	Server::processMode(const Command &cmd, int fromFd)
 	if (Channel::containsUser(ch->getUsers(), _users[fromFd]->getNickname()) == false)
 		return sendError(ERR_NOTONCHANNEL, fromFd, channel_name);
 
-	if (cmd.mode_operations.size() == 0)
+	if (cmd.mode_operations.empty())
 		return sendReply(RPL_CHANNELMODEIS, fromFd, channel_name, ch->getModes());
+	if (cmd.mode_operations[0] == "+b")
+		return sendReply(RPL_ENDOFBANLIST, fromFd, channel_name);
 
 	if (ch && Channel::containsUser(ch->getOperators(), _users[fromFd]->getNickname()) == false)
 		return sendError(ERR_CHANOPRIVSNEEDED, fromFd, channel_name);
