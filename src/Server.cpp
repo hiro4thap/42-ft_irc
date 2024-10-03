@@ -797,10 +797,10 @@ void	Server::sendMessage(const Command &cmd, int fromFd)
 	// User targets
 	for (std::size_t i = 0; i < cmd.users.size(); i++)
 	{
-		if (cmd.threw_error[i] && cmd.err_response[i] == ERR_NOSUCHCHANNEL)
+		if (cmd.threw_error[i] && cmd.err_response[i] == ERR_NOSUCHNICK)
 		{
 			if (isPrivmsg)
-				sendError(ERR_NOSUCHCHANNEL, fromFd, cmd.users[i]);
+				sendError(ERR_NOSUCHNICK, fromFd, cmd.users[i]);
 		}	
 		else if (getUserFd(cmd.users[i]) == _bot.getFd())
 			continue ;
