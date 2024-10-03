@@ -503,6 +503,11 @@ bool Parser::validatePass(ParsedCommand &cmd_in, Command &cmd_out)
 		cmd_out.message_set = true;
 		cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
 	}
+	else if (cmd_in.parameters.size() == 1)
+	{
+		cmd_out.message_set = true;
+		cmd_out.message = cmd_in.parameters[0];
+	}
 	return true;
 }
 
