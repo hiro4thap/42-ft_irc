@@ -95,9 +95,10 @@ void	Server::launch(int serverSocket)
 			// accepting connection request
 			if (_pfds[i].fd == serverSocket)
 			{
-				Log::nl("Client " + Log::str(_pfds.size()) + " is accepted", COLOR_YELLOW);
+				
 				// std::cout << "Client " << _pfds.size() << " is accepted" << std::endl;
 				int clientSocket = accept(serverSocket, NULL, NULL);
+				Log::nl("Client " + Log::str(clientSocket) + " is accepted", COLOR_YELLOW);
 				if (clientSocket == -1)
 				{
 					perror("accept");
@@ -128,7 +129,7 @@ void	Server::launch(int serverSocket)
 				std::string client_name = "";
 				if (i < _pfds.size() && _users.find(_pfds[i].fd) != _users.end())
 					client_name = _users[_pfds[i].fd]->getNickname();
-				Log::out("[Client " + Log::str(i) + ": \"" + client_name + "\"] ", COLOR_YELLOW);
+				Log::out("[Client on socket " + Log::str(_pfds[i].fd) + ": \"" + client_name + "\"] ", COLOR_YELLOW);
 				Log::nl(buffer);
 				// std::cout << "Message from client " << i << " :" << buffer << std::endl;
 				processCommand(buffer, _pfds[i].fd);
@@ -174,7 +175,7 @@ void	Server::delFromPfds(int fromFd)
 		if (_pfds[i].fd != fromFd)
 			continue ;
 		close(_pfds[i].fd);
-	}	
+	}
 }
 
 Channel	*Server::getChannelByName(const std::string &name)
@@ -242,8 +243,8 @@ void	Server::sendClient(std::string message, int toFd)
 	{
 		if (send(toFd, response.c_str() , response.size(), 0) == -1)
 			perror("send");
-		Log::out("[Server -> \"" + _users[toFd]->getNickname() + "\"] ", COLOR_CYAN);
-		Log::nl(response);
+			Log::out("[Server -> \"" + _users[toFd]->getNickname() + "\"] ", COLOR_CYAN);
+			Log::nl(response);
 	}
 }
 
@@ -271,7 +272,7 @@ void	Server::processCommand(std::string command, int fromFd)
 			commands["JOIN"]	= &Server::joinChannel;
 			commands["NICK"]	= &Server::setNickname;
 			commands["PRIVMSG"]	= &Server::sendMessage;
-			commands["NOTICE"]	= &Server::sendNotice;
+			commands["NOTICE"]	= &Server::sendMessage;
 			commands["KICK"]	= &Server::kickUser;
 			commands["INVITE"]	= &Server::inviteUser;
 			commands["TOPIC"]	= &Server::processTopic;
@@ -761,60 +762,52 @@ void	Server::proccessBot(const Command &cmd, int fromFd)
 	}
 }
 
-// PRIVMSG command
+// PRIVMSG/NOTICE command
 void	Server::sendMessage(const Command &cmd, int fromFd)
 {
-	if (cmd.users.empty() && cmd.channels.empty())
-		return sendError(ERR_NORECIPIENT, fromFd);
-	if (cmd.message_set == false)
-		return sendError(ERR_NOTEXTTOSEND, fromFd);
+	bool isPrivmsg = (cmd.command == "PRIVMSG") ? true : false;
 
+	if (cmd.users.empty() && cmd.channels.empty())
+	{
+		if (isPrivmsg)
+			sendError(ERR_NORECIPIENT, fromFd);
+		return ;
+	}
+	if (cmd.message_set == false)
+	{
+		if (isPrivmsg)
+			sendError(ERR_NOTEXTTOSEND, fromFd);
+		return ;
+	}
+
+	// Channel targets
 	for (std::size_t i = 0; i < cmd.channels.size(); i++)
 	{
 		if (channelExists(cmd.channels[i]))
-			sendChannel(":" + _users[fromFd]->getNickname() + " PRIVMSG " + cmd.channels[i] + " :" + cmd.message, cmd.channels[i], fromFd);
-		else
+			sendChannel(":" + _users[fromFd]->getNickname() + " " + cmd.command + " " + cmd.channels[i] + " :" + cmd.message, cmd.channels[i], fromFd);
+		else if (isPrivmsg)
 			sendError(ERR_NOSUCHNICK, fromFd, cmd.channels[i]); // Docs suggest this, but ERR_NOSUCHCHANNEL seems more appropriate
 	}
+
+	// User targets
 	for (std::size_t i = 0; i < cmd.users.size(); i++)
 	{
 		if (cmd.threw_error[i] && cmd.err_response[i] == ERR_NOSUCHCHANNEL)
-			sendError(ERR_NOSUCHCHANNEL, fromFd, cmd.users[i]);
+		{
+			if (isPrivmsg)
+				sendError(ERR_NOSUCHCHANNEL, fromFd, cmd.users[i]);
+		}	
 		else if (getUserFd(cmd.users[i]) == _bot.getFd())
 			continue ;
 		else if (userExists(cmd.users[i]))
-			sendCommand("PRIVMSG", fromFd, getUserFd(cmd.users[i]), cmd.users[i] + " :" + cmd.message);
-			// sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.message, getUserFd(cmd.users[i]));
-		else
+			sendCommand(cmd.command, fromFd, getUserFd(cmd.users[i]), cmd.users[i] + " :" + cmd.message);
+		else if (isPrivmsg)
 			sendError(ERR_NOSUCHNICK, fromFd, cmd.users[i]);
 	}
-	proccessBot(cmd, fromFd);
+	if (isPrivmsg)
+		proccessBot(cmd, fromFd);
 }
 
-// NOTICE command
-void	Server::sendNotice(const Command &cmd, int fromFd)
-{
-	if (cmd.users.empty() && cmd.channels.empty())
-		return ; // sendError(ERR_NORECIPIENT, fromFd);
-	if (cmd.message_set == false)
-		return ; // sendError(ERR_NOTEXTTOSEND, fromFd);
-
-	for (std::size_t i = 0; i < cmd.channels.size(); i++)
-	{
-		if (channelExists(cmd.channels[i]))
-			sendChannel(":" + _users[fromFd]->getNickname() + " NOTICE " + cmd.message, cmd.channels[0], fromFd);
-		// else
-		// 	sendError(ERR_NOSUCHNICK, fromFd, cmd.channels[i]); // Docs suggest this, but ERR_NOSUCHCHANNEL seems more appropriate
-	}
-	for (std::size_t i = 0; i < cmd.users.size(); i++)
-	{
-		if (userExists(cmd.users[i]))
-			sendCommand("NOTICE", fromFd, getUserFd(cmd.users[0]), cmd.message);
-			// sendClient(":" + _users[fromFd] + " NOTICE " + cmd.message, getUserFd(cmd.users[0]));
-		// else
-		// 	sendError(ERR_NOSUCHNICK, fromFd, cmd.users[i]);
-	}
-}
 
 // KICK command
 void	Server::kickUser(const Command &cmd, int fromFd)

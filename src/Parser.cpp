@@ -51,8 +51,8 @@ bool Parser::validateCommand(ParsedCommand &cmd_in, Command &cmd_out)
 	commands["JOIN"] = &validateJoin;
 	commands["USER"] = &validateUser;
 	commands["NICK"] = &validateNick;
-	commands["PRIVMSG"] = &validatePrivmsg;
-	commands["NOTICE"] = &validateNotice;
+	commands["PRIVMSG"] = &validateMessage;
+	commands["NOTICE"] = &validateMessage;
 	commands["KICK"] = &validateKick;
 	commands["INVITE"] = &validateInvite;
 	commands["TOPIC"] = &validateTopic;
@@ -173,8 +173,8 @@ bool Parser::validateUser(ParsedCommand &cmd_in, Command &cmd_out)
 	return true;
 }
 
-// PRIVMSG <target>{,<target>} <text to be sent>
-bool Parser::validatePrivmsg(ParsedCommand &cmd_in, Command &cmd_out)
+// PRIVMSG/NOTICE <target>{,<target>} <text to be sent>
+bool Parser::validateMessage(ParsedCommand &cmd_in, Command &cmd_out)
 {
 	std::string::const_iterator it, end, test_target, test_channel, test_nick;
 	if (cmd_in.parameters.size() > 0)
@@ -206,44 +206,6 @@ bool Parser::validatePrivmsg(ParsedCommand &cmd_in, Command &cmd_out)
 				cmd_out.users.push_back(std::string(it, test_nick));
 				cmd_out.threw_error.push_back(false);
 				cmd_out.err_response.push_back(0);
-				it = test_nick;
-			}
-		}
-	}
-	if (cmd_in.trailing.size() > 0)
-	{
-		cmd_out.message_set = true;
-		cmd_out.message = cmd_in.trailing.substr(1, std::string::npos);
-	}
-	return true;
-}
-
-// NOTICE <target>{,<target>} <text to be sent>
-bool Parser::validateNotice(ParsedCommand &cmd_in, Command &cmd_out)
-{
-	std::string::const_iterator it, end, test_target, test_channel, test_nick;
-	if (cmd_in.parameters.size() > 0)
-	{
-		it = cmd_in.parameters[0].begin();
-		end = cmd_in.parameters[0].end();
-		
-		while (is_char(it, ',') || it == cmd_in.parameters[0].begin())
-		{
-			if (is_char(it, ','))
-				it++;
-			test_target = it;
-			if (!target(test_target, end))
-				return false; // ?
-			test_channel = it;
-			test_nick = it;
-			if (channel(test_channel, end))
-			{
-				cmd_out.channels.push_back(std::string(it, test_channel));
-				it = test_channel;
-			}
-			else if (nick(test_nick, end))
-			{
-				cmd_out.users.push_back(std::string(it, test_nick));
 				it = test_nick;
 			}
 		}

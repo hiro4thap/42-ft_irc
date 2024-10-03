@@ -47,8 +47,7 @@ class Parser
 		static bool validateJoin(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateUser(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateNick(ParsedCommand &cmd_in, Command &cmd_out);
-		static bool validatePrivmsg(ParsedCommand &cmd_in, Command &cmd_out);
-		static bool validateNotice(ParsedCommand &cmd_in, Command &cmd_out);
+		static bool validateMessage(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateKick(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateInvite(ParsedCommand &cmd_in, Command &cmd_out);
 		static bool validateTopic(ParsedCommand &cmd_in, Command &cmd_out);
