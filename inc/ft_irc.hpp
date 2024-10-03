@@ -36,5 +36,6 @@
 # include "Log.hpp"
 # include "Parser.hpp"
 
+#define SHOW_SERVER_MSG false
 
 #endif

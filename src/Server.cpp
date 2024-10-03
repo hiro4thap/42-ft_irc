@@ -175,6 +175,8 @@ void	Server::delFromPfds(int fromFd)
 		if (_pfds[i].fd != fromFd)
 			continue ;
 		close(_pfds[i].fd);
+		_pfds.erase(_pfds.begin() + i);
+		break ;
 	}
 }
 
@@ -243,8 +245,11 @@ void	Server::sendClient(std::string message, int toFd)
 	{
 		if (send(toFd, response.c_str() , response.size(), 0) == -1)
 			perror("send");
+		if (_users[toFd] && SHOW_SERVER_MSG)
+		{
 			Log::out("[Server -> \"" + _users[toFd]->getNickname() + "\"] ", COLOR_CYAN);
 			Log::nl(response);
+		}
 	}
 }
 
