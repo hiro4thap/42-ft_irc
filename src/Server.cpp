@@ -722,7 +722,7 @@ void	Server::proccessBot(const Command &cmd, int fromFd)
 			Command cmd = _bot.proccessMessage(message);
 			if (cmd.threw_error.at(0))
 				return ;
-			cmd.message += "\r\n";
+			cmd.message =  "[@" + cmd.users[0] +"] " + cmd.message + "\r\n";
 			sendMessage(cmd, _bot.getFd());
 		}	
 	}
