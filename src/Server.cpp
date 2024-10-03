@@ -213,18 +213,7 @@ void	Server::sendClient(std::string message, int toFd)
 {
 	std::string response = message + "\r\n";
 	int serverSocket = _pfds[0].fd;
-	if (toFd == _bot.getFd())
-	{
-		Log::out("[Server -> \"" + _users[toFd]->getNickname() + "\"] ", COLOR_CYAN);
-		Log::nl(response);
-		Command cmd = _bot.proccessMessage(message);
-		if (cmd.threw_error.at(0))
-			return ;
-		cmd.message += "\r\n";
-
-		sendMessage(cmd, 2);
-	}
-	else if (toFd != serverSocket)
+	if (toFd != serverSocket && toFd != _bot.getFd())
 	{
 		if (send(toFd, response.c_str() , response.size(), 0) == -1)
 			perror("send");
@@ -708,6 +697,41 @@ void	Server::sendAllClients(std::string response, int fromFd)
 	}
 }
 
+void	Server::proccessBot(const Command &cmd, int fromFd)
+{
+	if (cmd.users.empty() && cmd.channels.empty())
+		return sendError(ERR_NORECIPIENT, fromFd);
+	if (cmd.message_set == false)
+		return sendError(ERR_NOTEXTTOSEND, fromFd);
+
+	// Channels
+	for (std::size_t i = 0; i < cmd.channels.size(); i++)
+	{
+		if (cmd.channels[i] == _bot.getChannel())
+		{
+			std::string message = ":" + _users[fromFd]->getNickname() + " PRIVMSG " + cmd.channels[i] + " :" + cmd.message;
+			Command cmd = _bot.proccessMessage(message);
+			if (cmd.threw_error.at(0))
+				return ;
+			cmd.message += "\r\n";
+			sendMessage(cmd, _bot.getFd());
+		}	
+	}
+	// Users
+	for (std::size_t i = 0; i < cmd.users.size(); i++)
+	{
+		if (getUserFd(cmd.users[i]) == _bot.getFd())
+		{
+			std::string message = sendCommand("PRIVMSG", fromFd, getUserFd(cmd.users[i]), ":" + cmd.message);
+			Command cmd = _bot.proccessMessage(message);
+			if (cmd.threw_error.at(0))
+				return ;
+			cmd.message += "\r\n";
+			sendMessage(cmd, _bot.getFd());
+		}
+	}
+}
+
 // PRIVMSG command
 void	Server::sendMessage(const Command &cmd, int fromFd)
 {
@@ -727,12 +751,15 @@ void	Server::sendMessage(const Command &cmd, int fromFd)
 	{
 		if (cmd.threw_error[i] && cmd.err_response[i] == ERR_NOSUCHCHANNEL)
 			sendError(ERR_NOSUCHCHANNEL, fromFd, cmd.users[i]);
-		if (userExists(cmd.users[i]))
+		else if (getUserFd(cmd.users[i]) == _bot.getFd())
+			continue ;
+		else if (userExists(cmd.users[i]))
 			sendCommand("PRIVMSG", fromFd, getUserFd(cmd.users[i]), ":" + cmd.message);
 			// sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.message, getUserFd(cmd.users[i]));
 		else
 			sendError(ERR_NOSUCHNICK, fromFd, cmd.users[i]);
 	}
+	proccessBot(cmd, fromFd);
 }
 
 // NOTICE command
@@ -962,7 +989,7 @@ void	Server::sendChannel(std::string response, const std::string &channel, int f
 	for (std::size_t i = 0; i < users.size(); i++)
 	{
 		int fd = getUserFd(users[i]);
-		if (fd == fromFd)
+		if (fd == fromFd || fd == _bot.getFd())
 			continue ;
 		sendClient(response, fd);
 	}

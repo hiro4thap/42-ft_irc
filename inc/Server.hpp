@@ -145,6 +145,8 @@ private:
 	void				quitServer(const Command &cmd, int fromFd);
 	void				checkPassword(const Command &cmd, int fromFd);
 
+	void				proccessBot(const Command &cmd, int fromFd);
+
 	void				processCommand(std::string command, int fd);
 	void				sendClient(std::string response, int toFd);
 	void				sendChannel(std::string response, const std::string &channel, int fromFd);
