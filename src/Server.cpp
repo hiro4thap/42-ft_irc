@@ -570,7 +570,7 @@ void	Server::processMode(const Command &cmd, int fromFd)
 
 	if (cmd.mode_operations.empty())
 		return sendReply(RPL_CHANNELMODEIS, fromFd, channel_name, ch->getModes());
-	if (cmd.mode_operations[0] == "+b")
+	if (cmd.mode_operations.size() == 1 && cmd.mode_operations[0] == "+b" && cmd.mode_parameters.empty())
 		return sendReply(RPL_ENDOFBANLIST, fromFd, channel_name);
 
 	if (ch && Channel::containsUser(ch->getOperators(), _users[fromFd]->getNickname()) == false)
