@@ -215,17 +215,14 @@ void	Server::sendClient(std::string message, int toFd)
 	int serverSocket = _pfds[0].fd;
 	if (toFd == _bot.getFd())
 	{
+		Log::out("[Server -> \"" + _users[toFd]->getNickname() + "\"] ", COLOR_CYAN);
+		Log::nl(response);
 		Command cmd = _bot.proccessMessage(message);
 		if (cmd.threw_error.at(0))
 			return ;
 		cmd.message += "\r\n";
 
-		if (send(getUserFd(cmd.users[0]), cmd.message.c_str() , cmd.message.size(), 0) == -1)
-			perror("send");
-		Log::out("[Server -> \"" + _users[toFd]->getNickname() + "\"] ", COLOR_CYAN);
-		Log::nl(response);
-		Log::out("\"" + _users[toFd]->getNickname() + " -> \"" + cmd.users[0] + "\"] ", COLOR_CYAN);
-		Log::nl(cmd.message);
+		sendMessage(cmd, 2);
 	}
 	else if (toFd != serverSocket)
 	{
