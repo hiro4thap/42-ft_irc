@@ -21,7 +21,7 @@ int	to_int(const std::string &str)
 
 int main(int argc, char *argv[])
 {
-	struct sigaction sa;
+	struct sigaction sa = {};
 	sa.sa_flags = SA_SIGINFO;//TODO: SIGINFO?
 	sa.sa_sigaction = &handler;
 	sigaction(SIGINT, &sa, NULL);

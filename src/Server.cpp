@@ -309,31 +309,40 @@ void	Server::processCommand(std::string command, int fromFd)
 		{
 			sendError(ERR_NOTREGISTERED, fromFd);
 		}
-		if (user->getRegistrationState() == REGISTERED && user->isRegistered() == false)
+
+		std::map<int, User*>::const_iterator user_it = _users.find(fromFd);
+		if (user_it != _users.end()
+			&& user_it->second->isRegistered() == false
+			&& user_it->second->getRegistrationState() == REGISTERED)
 		{
-			user->setRegistered();
-			std::size_t registered_users = getCurrentRegisteredUsers();
-			sendReply(RPL_WELCOME, user->getFd(), "", "Welcome to the 42 Internet Relay Chat Network " + user->getNickname());
-			sendReply(RPL_YOURHOST, user->getFd(),"", "Your host is " + _servername + "[" + _ipv4_address + "/" + Log::str(_port) + "], running version " + _version);
-			sendReply(RPL_CREATED, user->getFd(), "", "This server was created " + this->getTimeCreated());
-			// sendReply(RPL_MYINFO, user->getFd(), _servername + " " + _version, "o iklot ko				l", true);
-			sendReply(RPL_ISUPPORT, user->getFd(), "NICKLEN=9 CHANMODES=,k,l,it");
-			sendReply(RPL_LUSERCLIENT, user->getFd(), "", "There are " + Log::str(registered_users) + " users and 0 invisible on 1 servers");
-			sendReply(RPL_LUSERCHANNELS, user->getFd(), Log::str(_channels.size()));
-			sendReply(RPL_LUSERME, user->getFd(), "", "I have " + Log::str(registered_users) + " and 1 servers");
-			if (_motd_set)
-			{
-				sendReply(RPL_MOTDSTART, user->getFd());
-				for (std::size_t i = 0; i < _motd.size(); i++)
-				{
-					sendReply(RPL_MOTD, user->getFd(), "", "- " + _motd.at(i));
-				}
-				sendReply(RPL_ENDOFMOTD, user->getFd());
-			}
-			else
-				sendError(ERR_NOMOTD, user->getFd());
+			this->welcomeUser(user_it->second);
 		}
     }
+}
+
+void Server::welcomeUser(User* user)
+{
+	user->setRegistered();
+	std::size_t registered_users = getCurrentRegisteredUsers();
+	sendReply(RPL_WELCOME, user->getFd(), "", "Welcome to the 42 Internet Relay Chat Network " + user->getNickname());
+	sendReply(RPL_YOURHOST, user->getFd(),"", "Your host is " + _servername + "[" + _ipv4_address + "/" + Log::str(_port) + "], running version " + _version);
+	sendReply(RPL_CREATED, user->getFd(), "", "This server was created " + this->getTimeCreated());
+	// sendReply(RPL_MYINFO, user->getFd(), _servername + " " + _version, "o iklot ko				l", true);
+	sendReply(RPL_ISUPPORT, user->getFd(), "NICKLEN=9 CHANMODES=,k,l,it");
+	sendReply(RPL_LUSERCLIENT, user->getFd(), "", "There are " + Log::str(registered_users) + " users and 0 invisible on 1 servers");
+	sendReply(RPL_LUSERCHANNELS, user->getFd(), Log::str(_channels.size()));
+	sendReply(RPL_LUSERME, user->getFd(), "", "I have " + Log::str(registered_users) + " and 1 servers");
+	if (_motd_set)
+	{
+		sendReply(RPL_MOTDSTART, user->getFd());
+		for (std::size_t i = 0; i < _motd.size(); i++)
+		{
+			sendReply(RPL_MOTD, user->getFd(), "", "- " + _motd.at(i));
+		}
+		sendReply(RPL_ENDOFMOTD, user->getFd());
+	}
+	else
+		sendError(ERR_NOMOTD, user->getFd());
 }
 
 bool Server::userExists(const std::string &value)

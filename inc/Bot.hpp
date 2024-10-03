@@ -7,7 +7,7 @@
 # include "User.hpp"
 # include "Parser.hpp"
 # include "Log.hpp"
-
+# include <cstdlib>
 
 class Bot
 {

@@ -125,6 +125,8 @@ private:
 	bool				removeChannelFromServer(const std::string &channel_name);
 	const std::string	getTimeCreated() const;
 
+	void				welcomeUser(User* user);
+
 	void				sendError(enum Replies err_code, int requesting_client_fd, std::string extra_prefix = "");
 	void				sendReply(enum Replies rpl_code, int requesting_client_fd, std::string extra_prefix = "", std::string msg_override = "", bool no_colon = false);
 	std::string			sendReply(std::string command, int requesting_client_fd, std::string message);
