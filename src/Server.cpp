@@ -13,6 +13,13 @@ Server::Server(unsigned int port, std::string password):
 	else
 		_requires_authentication = true;
 	_server_created = time(0);
+	_motd_set = true;
+	_motd.push_back("WELCOME TO FT_IRC by hiono and jhughes");
+	_motd.push_back("Supported commands:");
+	_motd.push_back(" > /NICK <new_nickname>");
+	_motd.push_back(" > /TOPIC");
+	_motd.push_back(" > /PART");
+	_motd.push_back(" > /QUIT");
 }
 
 
@@ -294,7 +301,7 @@ void	Server::processCommand(std::string command, int fromFd)
 				sendReply(RPL_MOTDSTART, user->getFd());
 				for (std::size_t i = 0; i < _motd.size(); i++)
 				{
-					sendReply(RPL_MOTD, user->getFd());
+					sendReply(RPL_MOTD, user->getFd(), "", "- " + _motd.at(i));
 				}
 				sendReply(RPL_ENDOFMOTD, user->getFd());
 			}
@@ -452,7 +459,7 @@ void Server::sendReply(enum Replies rpl_code, int requesting_client_fd, std::str
 	// rpl_msg[RPL_BANLIST]			= "<client> <channel> <mask> [<who> <set-ts>]";
 	rpl_msg[RPL_ENDOFBANLIST]		= "End of channel ban list";
 	// rpl_msg[RPL_MOTD]				= "<line of the motd>";
-	// rpl_msg[RPL_MOTDSTART]			= "- <server> Message of the day - ";
+	rpl_msg[RPL_MOTDSTART]			= "- " + _servername + " Message of the day - ";
 	rpl_msg[RPL_ENDOFMOTD]			= "End of /MOTD command.";
 
 	std::string message = ":" + _servername + " " + Log::str(rpl_code, 3, '0') + " " + _users[requesting_client_fd]->getNickname() + " ";
