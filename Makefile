@@ -18,6 +18,7 @@ SRC			= main.cpp \
 			  Channel.cpp \
 			  User.cpp \
 			  Parser.cpp \
+			  Bot.cpp \
 			  Log.cpp
 
 OBJ			= $(SRC:.cpp=.o)

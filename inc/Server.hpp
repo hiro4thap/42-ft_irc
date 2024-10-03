@@ -4,6 +4,7 @@
 # include "ft_irc.hpp"
 # include "Channel.hpp"
 # include "User.hpp"
+# include "Bot.hpp"
 
 # include <cstring>
 # include <iostream>
@@ -94,9 +95,8 @@ struct user_info
 class	Server
 {
 public:
-	Server();
 	~Server();
-	Server(unsigned int port, std::string passwrod);
+	Server(unsigned int port, std::string password);
 	int		getSocketFd();
 	void	launch(int serverSocket);
 	
@@ -117,6 +117,7 @@ private:
 	// std::map<std::string, user_info>	_user_info;
 	// std::vector<int>					_passed_fds;
 	std::map<int, std::string>			_remaining_command;
+	Bot									_bot;
 
 	void				addToPfds(int fd);
 	void				delFromPfds(int fromFd);
@@ -143,6 +144,8 @@ private:
 	void				leaveChannel(const Command &cmd, int fromFd);
 	void				quitServer(const Command &cmd, int fromFd);
 	void				checkPassword(const Command &cmd, int fromFd);
+
+	void				proccessBot(const Command &cmd, int fromFd);
 
 	void				processCommand(std::string command, int fd);
 	void				sendClient(std::string response, int toFd);

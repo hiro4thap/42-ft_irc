@@ -1,9 +1,5 @@
 #include "../inc/Server.hpp"
 
-Server::Server()
-{
-}
-
 Server::~Server()
 {
 	Log::nl("\nStopping IRC Server... ", COLOR_MAGENTA);
@@ -27,6 +23,13 @@ Server::Server(unsigned int port, std::string password):
 	_password(password), _motd_set(false)
 {
 	_server_created = time(0);
+	_motd_set = true;
+	_motd.push_back("WELCOME TO FT_IRC by hiono and jhughes");
+	_motd.push_back("Supported commands:");
+	_motd.push_back(" > /NICK <new_nickname>");
+	_motd.push_back(" > /TOPIC");
+	_motd.push_back(" > /PART");
+	_motd.push_back(" > /QUIT");
 }
 
 int	Server::getSocketFd()
@@ -75,6 +78,13 @@ int	Server::getSocketFd()
 void	Server::launch(int serverSocket)
 {
 	Log::nl("Listening on " + _ipv4_address + "/" + Log::str(_port) + "...", COLOR_MAGENTA);
+	
+	// Load bot
+	_users[_bot.getFd()] = new User(_bot.getFd());
+	_bot.setupBot(_users[_bot.getFd()]);
+	
+	processCommand("JOIN " + _bot.getChannel() + "\r\n", _bot.getFd());
+
 	while (true)
 	{
 		poll(_pfds.data(), _pfds.size(), -1);
@@ -228,7 +238,7 @@ void	Server::sendClient(std::string message, int toFd)
 {
 	std::string response = message + "\r\n";
 	int serverSocket = _pfds[0].fd;
-	if (toFd != serverSocket)
+	if (toFd != serverSocket && toFd != _bot.getFd())
 	{
 		if (send(toFd, response.c_str() , response.size(), 0) == -1)
 			perror("send");
@@ -309,7 +319,7 @@ void	Server::processCommand(std::string command, int fromFd)
 				sendReply(RPL_MOTDSTART, user->getFd());
 				for (std::size_t i = 0; i < _motd.size(); i++)
 				{
-					sendReply(RPL_MOTD, user->getFd());
+					sendReply(RPL_MOTD, user->getFd(), "", "- " + _motd.at(i));
 				}
 				sendReply(RPL_ENDOFMOTD, user->getFd());
 			}
@@ -467,7 +477,7 @@ void Server::sendReply(enum Replies rpl_code, int requesting_client_fd, std::str
 	// rpl_msg[RPL_BANLIST]			= "<client> <channel> <mask> [<who> <set-ts>]";
 	rpl_msg[RPL_ENDOFBANLIST]		= "End of channel ban list";
 	// rpl_msg[RPL_MOTD]				= "<line of the motd>";
-	// rpl_msg[RPL_MOTDSTART]			= "- <server> Message of the day - ";
+	rpl_msg[RPL_MOTDSTART]			= "- " + _servername + " Message of the day - ";
 	rpl_msg[RPL_ENDOFMOTD]			= "End of /MOTD command.";
 
 	std::string message = ":" + _servername + " " + Log::str(rpl_code, 3, '0') + " " + _users[requesting_client_fd]->getNickname() + " ";
@@ -578,8 +588,10 @@ void	Server::processMode(const Command &cmd, int fromFd)
 	if (Channel::containsUser(ch->getUsers(), _users[fromFd]->getNickname()) == false)
 		return sendError(ERR_NOTONCHANNEL, fromFd, channel_name);
 
-	if (cmd.mode_operations.size() == 0)
+	if (cmd.mode_operations.empty())
 		return sendReply(RPL_CHANNELMODEIS, fromFd, channel_name, ch->getModes());
+	if (cmd.mode_operations.size() == 1 && cmd.mode_operations[0] == "+b" && cmd.mode_parameters.empty())
+		return sendReply(RPL_ENDOFBANLIST, fromFd, channel_name);
 
 	if (ch && Channel::containsUser(ch->getOperators(), _users[fromFd]->getNickname()) == false)
 		return sendError(ERR_CHANOPRIVSNEEDED, fromFd, channel_name);
@@ -714,6 +726,41 @@ void	Server::sendAllClients(std::string response, int fromFd)
 	}
 }
 
+void	Server::proccessBot(const Command &cmd, int fromFd)
+{
+	if (cmd.users.empty() && cmd.channels.empty())
+		return sendError(ERR_NORECIPIENT, fromFd);
+	if (cmd.message_set == false)
+		return sendError(ERR_NOTEXTTOSEND, fromFd);
+
+	// Channels
+	for (std::size_t i = 0; i < cmd.channels.size(); i++)
+	{
+		if (cmd.channels[i] == _bot.getChannel())
+		{
+			std::string message = ":" + _users[fromFd]->getNickname() + " PRIVMSG " + cmd.channels[i] + " :" + cmd.message;
+			Command cmd = _bot.proccessMessage(message);
+			if (cmd.threw_error.at(0))
+				return ;
+			cmd.message =  "[@" + cmd.users[0] +"] " + cmd.message + "\r\n";
+			sendMessage(cmd, _bot.getFd());
+		}	
+	}
+	// Users
+	for (std::size_t i = 0; i < cmd.users.size(); i++)
+	{
+		if (getUserFd(cmd.users[i]) == _bot.getFd())
+		{
+			std::string message = sendCommand("PRIVMSG", fromFd, getUserFd(cmd.users[i]), ":" + cmd.message);
+			Command cmd = _bot.proccessMessage(message);
+			if (cmd.threw_error.at(0))
+				return ;
+			cmd.message += "\r\n";
+			sendMessage(cmd, _bot.getFd());
+		}
+	}
+}
+
 // PRIVMSG command
 void	Server::sendMessage(const Command &cmd, int fromFd)
 {
@@ -733,12 +780,15 @@ void	Server::sendMessage(const Command &cmd, int fromFd)
 	{
 		if (cmd.threw_error[i] && cmd.err_response[i] == ERR_NOSUCHCHANNEL)
 			sendError(ERR_NOSUCHCHANNEL, fromFd, cmd.users[i]);
-		if (userExists(cmd.users[i]))
+		else if (getUserFd(cmd.users[i]) == _bot.getFd())
+			continue ;
+		else if (userExists(cmd.users[i]))
 			sendCommand("PRIVMSG", fromFd, getUserFd(cmd.users[i]), cmd.users[i] + " :" + cmd.message);
 			// sendClient(":" + _users[fromFd] + " PRIVMSG " + cmd.message, getUserFd(cmd.users[i]));
 		else
 			sendError(ERR_NOSUCHNICK, fromFd, cmd.users[i]);
 	}
+	proccessBot(cmd, fromFd);
 }
 
 // NOTICE command
@@ -968,7 +1018,7 @@ void	Server::sendChannel(std::string response, const std::string &channel, int f
 	for (std::size_t i = 0; i < users.size(); i++)
 	{
 		int fd = getUserFd(users[i]);
-		if (fd == fromFd)
+		if (fd == fromFd || fd == _bot.getFd())
 			continue ;
 		sendClient(response, fd);
 	}
