@@ -53,9 +53,12 @@ struct dice_roll parseDice(const std::string dice_roll)
 
 	while (it != dice_roll.end() && (*it >= '0' && *it <= '9'))
 	{
-		d.number_of_dice += 10 * (*it);
+		d.number_of_dice *= 10;
+		d.number_of_dice += (*it) - '0';
 		it++;
 	}
+	if (it == dice_roll.begin())
+		d.number_of_dice = 1;
 	if (it == dice_roll.end() || *it != 'd')
 	{
 		d.number_of_dice = -1;
@@ -71,7 +74,8 @@ struct dice_roll parseDice(const std::string dice_roll)
 	}
 	while (it != dice_roll.end() && (*it >= '0' && *it <= '9'))
 	{
-		d.number_of_dice += 10 * (*it);
+		d.number_of_sides *= 10;
+		d.number_of_sides += (*it) - '0';
 		it++;
 	}
 	if (*it == '\0' || it == dice_roll.end())
@@ -89,8 +93,11 @@ const std::string diceRoll(int num_dice, int num_sides)
 	if (num_sides == 0)
 		return std::string("Cannot roll zero sided dice");
 	if (num_dice == 0)
-		return std::string("No dice rolled");
-	
+		return std::string("0d") + Log::str(num_sides) + std::string("=0 (No dice rolled)");
+	if (num_dice > 20)
+		return std::string(Log::str(num_dice) + "d" + Log::str(num_sides) + ": Too many dice (Max: 20)");
+	if (num_sides > 100)
+		return std::string(Log::str(num_dice) + "d" + Log::str(num_sides) + ": Too many sides (Max: 100)");
 	std::string output = Log::str(num_dice) + "d" + Log::str(num_sides) + "=";
 	std::string individual_rolls = "";
 	int sum = 0;
@@ -102,7 +109,7 @@ const std::string diceRoll(int num_dice, int num_sides)
 			individual_rolls += ",";
 		individual_rolls += Log::str(result);
 	}
-	output += Log::str(sum) + "(" + individual_rolls + ")";
+	output += Log::str(sum) + " (" + individual_rolls + ")";
 	return output;
 }
 
@@ -137,7 +144,10 @@ Command	Bot::proccessMessage(const std::string& input) const
 	if (message_tokens.size() < 2 || message_tokens[0] != "r")
 		return cmd;
 	std::string dice_request = message_tokens[1];
-	std::string description = dice_request.substr(message_tokens[0].size() + 1 + message_tokens[1].size() + 1, std::string::npos);
+	std::size_t description_start = message_tokens[0].size() + 1 + message_tokens[1].size() + 1;
+	std::string description = "";
+	if (description_start < message.size())
+		description = message.substr(description_start, std::string::npos);
 
 	struct dice_roll dice = parseDice(dice_request);
 	if (dice.number_of_dice == -1 && dice.number_of_sides == -1)
@@ -146,7 +156,10 @@ Command	Bot::proccessMessage(const std::string& input) const
 
 	cmd.threw_error.at(0) = false;
 	cmd.message_set = true;
-	cmd.message = dice_result;
+	cmd.message = "";
+	if (description.empty() == false)
+		cmd.message = description + ": ";
+	cmd.message += dice_result;
 	cmd.command = "PRIVMSG";
 	cmd.users.push_back(from);
 	if (header_tokens.size() == 3)
