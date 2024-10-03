@@ -710,9 +710,18 @@ bool Parser::to(std::string::const_iterator &it, std::string::const_iterator &en
 // <channel>    ::= ('#' | '&') <chstring>
 bool Parser::channel(std::string::const_iterator &it, std::string::const_iterator &end)
 {
-	if (is_char(it,'#') == false && is_char(it, '&') == false)
+	bool leave_all = false;
+	if (is_char(it,'#') == false && is_char(it, '&') == false && is_char(it, '0') == false)
 		return false;
+	if (is_char(it, '0'))
+		leave_all = true;
 	it++;
+	if (leave_all)
+	{
+		if (it != end)
+			return false;
+		return true;
+	}
 	if (!chstring(it, end))
 		return false;
 		// return error(it);

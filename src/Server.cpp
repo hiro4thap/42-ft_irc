@@ -531,6 +531,30 @@ void	Server::joinChannel(const Command &cmd, int fromFd)
 		return sendError(ERR_NEEDMOREPARAMS, fromFd);
 
 	std::string channel_name = "";
+	if (cmd.channels.size() > 0 && cmd.channels[0] == "0")
+	{
+		if (cmd.channels.size() != 1 || cmd.keys.size() != 0)
+			return sendError(ERR_BADCHANMASK, fromFd, cmd.channels[0]);
+		// Part from all channels
+		Command part;
+		part.command = "PART";
+		part.message_set = true;
+		part.message = "User called JOIN 0";
+		part.threw_error.push_back(true);
+		part.err_response.push_back(0);
+		for (std::size_t i = 0; i < _channels.size(); i++)
+		{
+			if (_channels[i].containsUser(_channels[i].getUsers(), _users[fromFd]->getNickname()) == true)
+			{
+				part.channels.push_back(_channels[i].getName());
+			}
+		}
+		if (part.channels.empty() == false)
+		{
+			leaveChannel(part, fromFd);
+		}
+		return ;
+	}
 	for (std::size_t i = 0; i < cmd.channels.size(); i++)
 	{
 		channel_name = cmd.channels[i];
@@ -974,7 +998,7 @@ void	Server::leaveChannel(const Command &cmd, int fromFd)
 		// RESPONSE
 		removeUserFromChannel(_users[fromFd]->getNickname(), *ch);
 		sendChannel(
-			sendReply("PART", fromFd, channel_name + " " + cmd.message),
+			sendReply("PART", fromFd, channel_name + " :" + cmd.message),
 			channel_name, fromFd);
 		// std::string message = ":" + _users[fromFd] + " PART " + channel_name + " " + cmd.message;
 		// sendClient(message, fromFd);
