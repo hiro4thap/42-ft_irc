@@ -17,7 +17,6 @@ Parser::Parser()
 	_supported_commands.insert("PASS");		// PASS <password>
 }
 
-
 bool Parser::error(std::string::const_iterator &it)
 {
 	if (_func_stack.size() == 0)
@@ -31,12 +30,6 @@ bool Parser::error(std::string::const_iterator &it)
 	}
 	std::cout << "Error: " + location + ": Error encountered at \'" + *it + "\'" << std::endl;
 	return false;
-}
-
-bool Parser::out(bool value)
-{
-	_func_stack.pop();
-	return value;
 }
 
 bool Parser::validateCommand(ParsedCommand &cmd_in, Command &cmd_out)
@@ -484,7 +477,7 @@ bool Parser::message(std::string message, Command &cmd_out)
 	std::string::const_iterator it = message.begin();
 	std::string::const_iterator test = it;
 
-	// Client to not send a source/prefix	
+	// Client to not send a source/prefix
 	if (is_char(it, ':'))
 		return false;
 	test = it;
@@ -497,10 +490,6 @@ bool Parser::message(std::string message, Command &cmd_out)
 		return false;
 	it = test;
 	params(it, cmd_in);
-	// if (!params(it, cmd_in))
-	// {
-	// 	return (error(it));
-	// }
 	if (!crlf(it))
 	{
 		return (error(it));
@@ -508,35 +497,6 @@ bool Parser::message(std::string message, Command &cmd_out)
 	bool result = validateCommand(cmd_in, cmd_out);
 	return result;
 }
-
-// // <prefix>   ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]
-// bool Parser::prefix(std::string::const_iterator &it)
-// {
-// 	_func_stack.push("prefix");
-// 	if(!servername(it))
-// 	{
-// 		if (nick(it))
-// 		{
-// 			if (is_char(it,'!'))
-// 			{
-// 				if (!user(it))
-// 				{
-// 					return error(it);
-// 				}
-// 			}
-// 			if (is_char(it,'@'))
-// 			{
-// 				if (!host(it))
-// 				{
-// 					return error(it);
-// 				}
-// 			}
-// 			return true;
-// 		}
-// 		return false;
-// 	}
-// 	return true;
-// }
 
 
 // <command>  ::= <letter> { <letter> } | <number> <number> <number>
@@ -651,6 +611,7 @@ bool Parser::crlf(std::string::const_iterator &it)
 }
 
 // TARGETS
+
 // <target>     ::= <to> [ "," <target> ]
 bool Parser::target(std::string::const_iterator &it, std::string::const_iterator &end)
 {
@@ -674,24 +635,9 @@ bool Parser::target(std::string::const_iterator &it, std::string::const_iterator
 // <to>         ::= <channel> | <user> '@' <servername> | <nick> | <mask>
 bool Parser::to(std::string::const_iterator &it, std::string::const_iterator &end)
 {
-	// _func_stack.push("to");
 	if (!channel(it, end))
 	{
-		/* if (user(it, end))
-		{
-			if (!is_char(it, '@'))
-			{
-				return false;
-				// return (error(it));
-			}
-			if (!servername(it, end))
-			{
-				return false;
-				// return (error(it));
-			}
-			return true;
-		}
-		else  */if (nick(it, end))
+		if (nick(it, end))
 		{
 			return true;
 		}
@@ -722,57 +668,6 @@ bool Parser::channel(std::string::const_iterator &it, std::string::const_iterato
 	}
 	if (!chstring(it, end))
 		return false;
-		// return error(it);
-	return true;
-}
-
-// <servername> ::= <host>
-bool Parser::servername(std::string::const_iterator &it, std::string::const_iterator &end)
-{
-	return host(it, end);
-}
-
-// <host>       ::= see RFC 952 [DNS:4] for details on allowed hostnames
-// <hname>      ::= <name>*["."<name>]
-// <name>       ::= <letter>[*[<let-or-digit-or-hyphen>]<let-or-digit>]
-bool Parser::host(std::string::const_iterator &it, std::string::const_iterator &end)
-{
-	// _func_stack.push("host");
-	if (!name(it, end))
-		return false;
-	std::string::const_iterator test = it;
-	while (is_char(it, '.'))
-	{
-		test++;
-		if (!name(test, end))
-			return false;
-			// return (error(it));
-	}
-	return true;	
-}
-
-// <name>       ::= <letter> [*[let-or-digit-or-hyphen]<let-or-digit>]
-bool Parser::name(std::string::const_iterator &it, std::string::const_iterator &end)
-{
-	// _func_stack.push("name");
-	if (!letter(it))
-	{
-		return false;
-	}
-	it++;
-	while (it != end && (letter(it) || number(it) || is_char(it, '-')))
-	{
-		std::string::const_iterator test = it;
-		if (is_char(it, '-'))
-		{
-			test++;
-			// if 'it' is the last character, return error.
-			if (!(letter(test) || number(test) || is_char(test, '-')))
-				return false;
-				// return (error(it));
-		}
-		it++;
-	}
 	return true;
 }
 
@@ -824,6 +719,7 @@ bool Parser::chstring(std::string::const_iterator &it, std::string::const_iterat
 }
 
 // OTHER
+
 // <user>       ::= <nonwhite> { <nonwhite> }
 bool Parser::user(std::string::const_iterator &it, std::string::const_iterator &end)
 {
@@ -832,20 +728,6 @@ bool Parser::user(std::string::const_iterator &it, std::string::const_iterator &
 		return false;
 	}
 	while (it != end && nonwhite(it))
-	{
-		it++;
-	}
-	return true;
-}
-
-// <username>	::= 1*(<not in "\0\r\n @">)
-bool Parser::username(std::string::const_iterator &it, std::string::const_iterator &end)
-{
-	if (is_in(it, std::string("\0\r\n @", 5)))
-	{
-		return false;
-	}
-	while (it != end && !is_in(it, std::string("\0\r\n @", 5)))
 	{
 		it++;
 	}
@@ -882,8 +764,9 @@ bool Parser::nonwhite(std::string::const_iterator &it)
 	return (!is_in(it, std::string(" \0\r\n", 4)));
 }
 
-
 // HELPERS
+
+/// @brief Queries if value pointed to by iterator is equal to target character
 bool Parser::is_char(std::string::const_iterator &it, char c)
 {
 	if (*it == c)
@@ -891,7 +774,7 @@ bool Parser::is_char(std::string::const_iterator &it, char c)
 	return false;
 }
 
-
+/// @brief Quries if value pointed to by iterator is any character in provided string
 bool Parser::is_in(std::string::const_iterator &it, std::string str)
 {
 	for (std::size_t i = 0; i < str.size(); i++)
