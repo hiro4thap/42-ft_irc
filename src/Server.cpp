@@ -580,10 +580,10 @@ void	Server::joinChannel(const Command &cmd, int fromFd)
 			sendError(ERR_CHANNELISFULL, fromFd, channel_name);
 		else if (ch->getIsInviteOnly() && Channel::containsUser(ch->getInvitedUsers(), _users[fromFd]->getNickname()) == false)
 			sendError(ERR_INVITEONLYCHAN, fromFd, channel_name);
-		else if (Channel::containsUser(ch->getInvitedUsers(), _users[fromFd]->getNickname()))
-			ch->removeInvitedUser(_users[fromFd]->getNickname());
 		else
 		{
+			if (Channel::containsUser(ch->getInvitedUsers(), _users[fromFd]->getNickname()))
+				ch->removeInvitedUser(_users[fromFd]->getNickname());
 			ch->addUser(_users[fromFd]->getNickname());
 			sendChannel(
 				sendReply("JOIN", fromFd, channel_name),
