@@ -1,3 +1,8 @@
+/*
+The reference client for this project is KVIrc v5.0.0 for MacOX.
+It can be downloaded here: https://www.kvirc.net/?id=releases&platform=macosx&version=5.0.0&lang=en
+*/
+
 #ifndef FT_IRC_HPP
 # define FT_IRC_HPP
 
