@@ -30,6 +30,11 @@ Server::Server(unsigned int port, std::string password):
 	_motd.push_back(" > /TOPIC");
 	_motd.push_back(" > /PART");
 	_motd.push_back(" > /QUIT");
+	_motd.push_back(" == DiceBot ==");
+	_motd.push_back(" Message user \"DiceBot\" or join channel \"#Dice\" to roll dice.");
+	_motd.push_back("Syntax: \"r <number of dice>d<number of sides> <description of dice roll>");
+	_motd.push_back(" > Example: \"r 6d6 Fireball\"");
+	_motd.push_back(" [Max dice: 20; Max sides: 100]");
 }
 
 int	Server::getSocketFd()
@@ -96,7 +101,6 @@ void	Server::launch(int serverSocket)
 			if (_pfds[i].fd == serverSocket)
 			{
 				
-				// std::cout << "Client " << _pfds.size() << " is accepted" << std::endl;
 				int clientSocket = accept(serverSocket, NULL, NULL);
 				Log::nl("Client " + Log::str(clientSocket) + " is accepted", COLOR_YELLOW);
 				if (clientSocket == -1)
@@ -129,7 +133,6 @@ void	Server::launch(int serverSocket)
 					client_name = _users[_pfds[i].fd]->getNickname();
 				Log::out("[Client on socket " + Log::str(_pfds[i].fd) + ": \"" + client_name + "\"] ", COLOR_YELLOW);
 				Log::nl(buffer);
-				// std::cout << "Message from client " << i << " :" << buffer << std::endl;
 				processCommand(buffer, _pfds[i].fd);
 			}
 		}
@@ -196,8 +199,6 @@ const std::string		Server::getTimeCreated() const
 bool	Server::hasPassed(int fd)
 {
 	return _users[fd]->isAuthenticated();
-	// std::vector<int>::iterator	it = std::find(_passed_fds.begin(), _passed_fds.end(), fd);
-	// return (it != _passed_fds.end());
 }
 
 bool	Server::removeChannelFromServer(const std::string &channel_name)
@@ -327,7 +328,6 @@ void Server::welcomeUser(User* user)
 	sendReply(RPL_WELCOME, user->getFd(), "", "Welcome to the 42 Internet Relay Chat Network " + user->getNickname());
 	sendReply(RPL_YOURHOST, user->getFd(),"", "Your host is " + _servername + "[" + _ipv4_address + "/" + Log::str(_port) + "], running version " + _version);
 	sendReply(RPL_CREATED, user->getFd(), "", "This server was created " + this->getTimeCreated());
-	// sendReply(RPL_MYINFO, user->getFd(), _servername + " " + _version, "o iklot ko				l", true);
 	sendReply(RPL_ISUPPORT, user->getFd(), "NICKLEN=9 CHANMODES=,k,l,it");
 	sendReply(RPL_LUSERCLIENT, user->getFd(), "", "There are " + Log::str(registered_users) + " users and 0 invisible on 1 servers");
 	sendReply(RPL_LUSERCHANNELS, user->getFd(), Log::str(_channels.size()));
@@ -384,8 +384,6 @@ void	Server::setNickname(const Command &cmd, int fromFd)
 	{
 		user->setNickname(nickname);
 		user->setRegistrationState(PROVIDED_NICK);
-		// sendReply(RPL_WELCOME, fromFd, "", ":Welcome " + nickname, true);
-		// sendClient(":server 001 " + nickname, fromFd);
 	}
 	else
 	{
@@ -475,24 +473,13 @@ void Server::sendError(enum Replies err_code, int requesting_client_fd, std::str
 void Server::sendReply(enum Replies rpl_code, int requesting_client_fd, std::string extra_prefix, std::string msg_override, bool no_colon)
 {
 	std::map<enum Replies, std::string> rpl_msg;
-	// rpl_msg[RPL_WELCOME]			= "Welcome to the <networkname> Network, <nick>[!<user>@<host>]";
-	// rpl_msg[RPL_YOURHOST]			= "Your host is <servername>, running version <version>";
-	// rpl_msg[RPL_CREATED]			= "This server was created <datetime>";
-	// rpl_msg[RPL_MYINFO]				= "<client> <servername> <version> <available user modes> <available channel modes> [<channel modes with a parameter>]"; //
 	rpl_msg[RPL_ISUPPORT]			= "are supported by this server";
 	rpl_msg[RPL_LUSERCHANNELS]		= "channels formed";
 	rpl_msg[RPL_NONE]				= "";
 	rpl_msg[RPL_NOTOPIC]			= "No topic is set";
-	// rpl_msg[RPL_TOPIC]				= "<topic>";
-	// rpl_msg[RPL_TOPICWHOTIME]		= "<client> <channel> <nick> <setat>"; //
-	// rpl_msg[RPL_INVITELIST]			= "<client> <channel>";
 	rpl_msg[RPL_ENDOFINVITELIST]	= "End of /INVITE list";
-	// rpl_msg[RPL_INVITING]			= "<client> <nick> <channel>";
-	// rpl_msg[RPL_NAMREPLY]			= "[prefix]<nick>{ [prefix]<nick>}";
 	rpl_msg[RPL_ENDOFNAMES]			= "End of /NAMES list";
-	// rpl_msg[RPL_BANLIST]			= "<client> <channel> <mask> [<who> <set-ts>]";
 	rpl_msg[RPL_ENDOFBANLIST]		= "End of channel ban list";
-	// rpl_msg[RPL_MOTD]				= "<line of the motd>";
 	rpl_msg[RPL_MOTDSTART]			= "- " + _servername + " Message of the day - ";
 	rpl_msg[RPL_ENDOFMOTD]			= "End of /MOTD command.";
 
@@ -594,8 +581,6 @@ void	Server::joinChannel(const Command &cmd, int fromFd)
 		else if (Channel::containsUser(ch->getInvitedUsers(), _users[fromFd]->getNickname()))
 			ch->removeInvitedUser(_users[fromFd]->getNickname());
 		ch->addUser(_users[fromFd]->getNickname());
-		// sendChannel(":" + _users[fromFd] + " JOIN " + channel_name, channel_name, fromFd);
-		// sendClient(":" + _users[fromFd] + " JOIN " + channel_name, fromFd);
 		sendChannel(
 			sendReply("JOIN", fromFd, channel_name),
 			channel_name, fromFd);
@@ -741,18 +726,8 @@ void	Server::processMode(const Command &cmd, int fromFd)
 		sendChannel(
 			sendReply("MODE", fromFd, channel_name + " " + processed_operations + " " + processed_parameters),
 			channel_name, fromFd);
-		// std::string	message = ":" + _users[fromFd] + " MODE " + channel_name + " " + processed_operations + " " + processed_parameters;
-		// sendClient(message, fromFd);
-		// sendChannel(message, channel_name, fromFd);
 	}
-	// 461 ERR_NEEDMOREPARAMS
 	// 467 ERR_KEYSET
-	// 502 ERR_USERSDONTMATCH
-	// 501 ERR_UMODEUNKNOWNFLAG
-	
-	
-	// 367 RPL_BANLIST
-	// 368 RPL_ENDOFBANLIST
 }
 
 void	Server::sendAllClients(std::string response, int fromFd)
@@ -880,7 +855,6 @@ void	Server::kickUser(const Command &cmd, int fromFd)
 			sendError(ERR_USERNOTINCHANNEL, fromFd, cmd.users[i] + " " + channel_name);
 			continue ;
 		}
-		// std::string message = ":" + _users[fromFd] + " KICK " + channel_name + " " + cmd.users[i];
 		std::string message = channel_name + " " + cmd.users[i];
 		if (cmd.message_set)
 			message += " :" + cmd.message;
@@ -889,8 +863,6 @@ void	Server::kickUser(const Command &cmd, int fromFd)
 		sendChannel(
 			sendReply("KICK", fromFd, message),
 			channel_name, fromFd);
-		// sendClient(message, fromFd);
-		// sendChannel(message, channel_name, fromFd);
 		removeUserFromChannel(cmd.users[i], *ch);
 	}
 	if (ch->getUsers().empty())
@@ -971,8 +943,6 @@ void	Server::processTopic(const Command &cmd, int fromFd)
 	sendChannel(
 		sendReply("TOPIC", fromFd, channel_name + " " + cmd.message),
 		channel_name, fromFd);
-	// sendClient(":" + _users[fromFd] + " TOPIC " + channel_name + " " + cmd.message, fromFd);
-	// sendChannel(":" + _users[fromFd] + " TOPIC " + channel_name + " " + cmd.message, channel_name, fromFd);
 	
 }
 
@@ -1010,9 +980,6 @@ void	Server::leaveChannel(const Command &cmd, int fromFd)
 		sendChannel(
 			sendReply("PART", fromFd, channel_name + " :" + cmd.message),
 			channel_name, fromFd);
-		// std::string message = ":" + _users[fromFd] + " PART " + channel_name + " " + cmd.message;
-		// sendClient(message, fromFd);
-		// sendChannel(message, channel_name, fromFd);
 		if (ch->getUsers().empty())
 			removeChannelFromServer(ch->getName());
 	}
