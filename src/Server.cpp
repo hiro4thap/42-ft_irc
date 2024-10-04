@@ -89,6 +89,8 @@ void	Server::launch(int serverSocket)
 	_bot.setupBot(_users[_bot.getFd()]);
 	
 	processCommand("JOIN " + _bot.getChannel() + "\r\n", _bot.getFd());
+	std::string	topic = "Try \"r 6d6 Fireball\"";
+	processCommand("TOPIC " + _bot.getChannel() + " :" + topic + "\r\n", _bot.getFd());
 
 	while (true)
 	{
@@ -580,20 +582,23 @@ void	Server::joinChannel(const Command &cmd, int fromFd)
 			sendError(ERR_INVITEONLYCHAN, fromFd, channel_name);
 		else if (Channel::containsUser(ch->getInvitedUsers(), _users[fromFd]->getNickname()))
 			ch->removeInvitedUser(_users[fromFd]->getNickname());
-		ch->addUser(_users[fromFd]->getNickname());
-		sendChannel(
-			sendReply("JOIN", fromFd, channel_name),
-			channel_name, fromFd);
-		
-		if (ch->getTopicSetAt().empty())
-			sendReply(RPL_NOTOPIC, fromFd, channel_name);
 		else
 		{
-			sendReply(RPL_TOPIC, fromFd, channel_name, ch->getTopic());
-			sendReply(RPL_TOPICWHOTIME, fromFd, channel_name, ch->getTopicSetBy() + " " + ch->getTopicSetAt(), true);
+			ch->addUser(_users[fromFd]->getNickname());
+			sendChannel(
+				sendReply("JOIN", fromFd, channel_name),
+				channel_name, fromFd);
+			
+			if (ch->getTopicSetAt().empty())
+				sendReply(RPL_NOTOPIC, fromFd, channel_name);
+			else
+			{
+				sendReply(RPL_TOPIC, fromFd, channel_name, ch->getTopic());
+				sendReply(RPL_TOPICWHOTIME, fromFd, channel_name, ch->getTopicSetBy() + " " + ch->getTopicSetAt(), true);
+			}
+			sendReply(RPL_NAMREPLY, fromFd, "= " + channel_name, getNameList(ch));
+			sendReply(RPL_ENDOFNAMES, fromFd, channel_name);
 		}
-		sendReply(RPL_NAMREPLY, fromFd, "= " + channel_name, getNameList(ch));
-		sendReply(RPL_ENDOFNAMES, fromFd, channel_name);
 	}
 }
 
@@ -838,6 +843,8 @@ void	Server::kickUser(const Command &cmd, int fromFd)
 		return sendError(ERR_NOSUCHNICK, fromFd, channel_name);
 	Channel *ch = getChannelByName(channel_name);
 
+	if (!ch)
+		return sendError(ERR_NOSUCHNICK, fromFd, channel_name);
 	if (Channel::containsUser(ch->getUsers(), _users[fromFd]->getNickname()) == false)
 		return sendError(ERR_NOTONCHANNEL, fromFd, channel_name);
 	if (Channel::containsUser(ch->getOperators(), _users[fromFd]->getNickname()) == false)
@@ -886,10 +893,10 @@ void	Server::inviteUser(const Command &cmd, int fromFd)
 
 	std::string channel_name = cmd.channels[0];
 
-	if ((cmd.threw_error[0] && cmd.err_response[0] == ERR_NOSUCHNICK) || !channelExists(channel_name))
-		return sendError(ERR_NOSUCHCHANNEL, fromFd, channel_name);
-	if (cmd.threw_error[1] && cmd.err_response[1] == ERR_NOSUCHNICK)
-		return sendError(ERR_NOSUCHCHANNEL, fromFd, cmd.users[0]);
+	if ((cmd.threw_error[0] && cmd.err_response[0] == ERR_NOSUCHNICK) || !userExists(cmd.users[0]))
+		return sendError(ERR_NOSUCHNICK, fromFd, cmd.users[0]);
+	if ((cmd.threw_error[1] && cmd.err_response[1] == ERR_NOSUCHNICK) || !channelExists(channel_name))
+		return sendError(ERR_NOSUCHNICK, fromFd, channel_name);
 	Channel *ch = getChannelByName(channel_name);
 
 	if (Channel::containsUser(ch->getUsers(), _users[fromFd]->getNickname()) == false)
@@ -898,7 +905,7 @@ void	Server::inviteUser(const Command &cmd, int fromFd)
 		return sendError(ERR_CHANOPRIVSNEEDED, fromFd, channel_name);
 	// 443 ERR_USERONCHAN
 	if (ch && Channel::containsUser(ch->getUsers(), cmd.users[0]))
-		return sendError(ERR_USERONCHANNEL, fromFd, channel_name);
+		return sendError(ERR_USERONCHANNEL, fromFd, cmd.users[0] + " " + channel_name);
 
 	// 341 RPL_INVITING
 	// RESPONSE
@@ -941,7 +948,7 @@ void	Server::processTopic(const Command &cmd, int fromFd)
 	
 	ch->setTopic(cmd.message, _users[fromFd]->getNickname());
 	sendChannel(
-		sendReply("TOPIC", fromFd, channel_name + " " + cmd.message),
+		sendReply("TOPIC", fromFd, channel_name + " :" + cmd.message),
 		channel_name, fromFd);
 	
 }

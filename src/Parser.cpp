@@ -177,17 +177,9 @@ bool Parser::validateMessage(ParsedCommand &cmd_in, Command &cmd_out)
 		{
 			if (is_char(it, ','))
 				it++;
-			test_target = it;
 			test_channel = it;
 			test_nick = it;
-			if (!target(test_target, end))
-			{
-				cmd_out.users.push_back(std::string(it, test_target));
-				cmd_out.threw_error.push_back(true);
-				cmd_out.err_response.push_back(ERR_NOSUCHNICK);
-				it = test_target;
-			}
-			else if (channel(test_channel, end))
+			if (channel(test_channel, end))
 			{
 				cmd_out.channels.push_back(std::string(it, test_channel));
 				it = test_channel;
@@ -198,6 +190,14 @@ bool Parser::validateMessage(ParsedCommand &cmd_in, Command &cmd_out)
 				cmd_out.threw_error.push_back(false);
 				cmd_out.err_response.push_back(0);
 				it = test_nick;
+			}
+			else
+			{
+				test_target = std::find(it, end, ',');
+				cmd_out.users.push_back(std::string(it, test_target));
+				cmd_out.threw_error.push_back(true);
+				cmd_out.err_response.push_back(ERR_NOSUCHNICK);
+				it = test_target;
 			}
 		}
 	}
