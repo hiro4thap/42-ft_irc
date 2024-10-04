@@ -24,6 +24,8 @@ class User
 
 		Registration_State	getRegistrationState() const;
 		void				setRegistrationState(Registration_State state);
+		bool				getHasConnected() const;
+		void				setHasDisconnected();
 		int					getFd() const;
 
 		const std::string&	getNickname() const;
@@ -39,6 +41,7 @@ class User
 		bool				_authenticated;
 		bool				_registered;
 		Registration_State	_registration_state;
+		bool				_has_disconnected;
 		
 		// User details
 		std::string			_nickname;

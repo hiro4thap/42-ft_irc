@@ -1,7 +1,7 @@
 #include "../inc/User.hpp"
 
 User::User(int fd): 
-	_socket_fd(fd), _authenticated(false), _registered(false), _registration_state(CONNECTED),
+	_socket_fd(fd), _authenticated(false), _registered(false), _registration_state(CONNECTED), _has_disconnected(false),
 	_nickname(""), _username(""), _real_name("")
 {
 }
@@ -43,6 +43,16 @@ void    User::setRegistrationState(Registration_State state)
 	if ((_registration_state == PROVIDED_NICK && state == PROVIDED_USER)
 		|| (_registration_state == PROVIDED_USER && state == PROVIDED_NICK))
 		_registration_state = REGISTERED;
+}
+
+bool	User::getHasConnected() const
+{
+	return _has_disconnected;
+}
+
+void	User::setHasDisconnected()
+{
+	_has_disconnected = true;
 }
 
 int User::getFd() const

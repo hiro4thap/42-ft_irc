@@ -111,10 +111,8 @@ void	Server::launch(int serverSocket)
 			// remove user if disconnected
 			else if (_pfds[i].revents & POLLHUP)
 			{
-				if (_users[_pfds[i].fd]->isRegistered())
-					processCommand("QUIT :client's process is terminated\r\n", _pfds[i].fd);
-				else
-					delFromPfds(_pfds[i].fd);
+				_users[_pfds[i].fd]->setHasDisconnected();
+				processCommand("QUIT :client's process is terminated\r\n", _pfds[i].fd);
 			}
 			// recieving data
 			else
@@ -265,12 +263,14 @@ void	Server::processCommand(std::string command, int fromFd)
 		if (this->_requires_authentication && user->isAuthenticated() == false)
 		{
 			commands["PASS"]	= &Server::checkPassword;
+			commands["QUIT"]	= &Server::quitServer;
 		}
 		else if (user->getRegistrationState() < REGISTERED)
 		{
 			commands["NICK"]	= &Server::setNickname;
 			commands["USER"]	= &Server::setUser;
 			commands["PASS"]	= &Server::checkPassword;
+			commands["QUIT"]	= &Server::quitServer;
 		}
 		else
 		{
@@ -1021,10 +1021,16 @@ void	Server::leaveChannel(const Command &cmd, int fromFd)
 // QUIT command
 void	Server::quitServer(const Command &cmd, int fromFd)
 {
-	std::string	message = "ERROR :closing connection [Quit " + cmd.message + "]";
-	sendClient(message, fromFd);
-	message = ":" + _users[fromFd]->getNickname() + " QUIT :Quit " + cmd.message;
-	sendAllClients(message, fromFd);
+	if (_users[fromFd]->getRegistrationState() == REGISTERED)
+	{
+		if (!_users[fromFd]->getHasConnected())
+		{
+			std::string	message = "ERROR :closing connection [Quit " + cmd.message + "]";
+			sendClient(message, fromFd);
+		}
+		std::string	message = ":" + _users[fromFd]->getNickname() + " QUIT :Quit " + cmd.message;
+		sendAllClients(message, fromFd);
+	}
 	delFromPfds(fromFd);
 }
 
